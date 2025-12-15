@@ -1,72 +1,102 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VRH PROD</title>
-  <link rel="stylesheet" href="./style.css">
+  <meta name="description" content="VRH PROD — Réalisation & montage. Real Estate, Interviews, Projets indé." />
+  <link rel="stylesheet" href="./style.css" />
 </head>
 
 <body data-page="home">
-  <div class="cursor-dot"></div>
-  <div class="page-transition"></div>
+  <div class="cursor-dot" aria-hidden="true"></div>
+  <div class="page-transition" aria-hidden="true"></div>
 
-  <!-- HEADER -->
   <header class="header">
     <div class="hotkeys">
       <div class="hotkeys__inner">
-        <div class="hotkeys__left">
-          <span class="hotkey"><span class="keycap">R</span>Real Estate</span>
-          <span class="hotkey"><span class="keycap">I</span>Interviews</span>
-          <span class="hotkey"><span class="keycap">P</span>Projets indé</span>
+        <div class="hotkeys__group">
+          <span class="hotkey" data-key="r" data-tip="Real Estate">
+            <span class="keycap">R</span><span class="hotkey__txt">Real Estate</span>
+          </span>
+          <span class="hotkey" data-key="i" data-tip="Reels Interviews">
+            <span class="keycap">I</span><span class="hotkey__txt">Interviews</span>
+          </span>
+          <span class="hotkey" data-key="p" data-tip="Projets indépendants">
+            <span class="keycap">P</span><span class="hotkey__txt">Projets indé</span>
+          </span>
         </div>
 
-        <a href="./index.html" class="brand">
-          <img src="./vrh-logo.png" alt="VRH PROD">
+        <a class="brand" href="./index.html" aria-label="Retour accueil">
+          <img class="brand__logo" src="./vrh-logo.png" alt="VRH PROD" />
         </a>
 
-        <div class="hotkeys__right">
-          <span class="hotkey"><span class="keycap">H</span>Home</span>
-          <span class="hotkey"><span class="keycap">Esc</span>Close</span>
+        <div class="hotkeys__group">
+          <span class="hotkey" data-key="h" data-tip="Accueil">
+            <span class="keycap">H</span><span class="hotkey__txt">Home</span>
+          </span>
+          <span class="hotkey" data-key="escape" data-tip="Fermer">
+            <span class="keycap">Esc</span><span class="hotkey__txt">Close</span>
+          </span>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- MAIN -->
   <main class="wrap wrap--home">
-    <section class="hero">
-      <div class="tilt" data-tilt>
-        <h1 class="title-glow">VRH PROD</h1>
+    <section class="hero hero--home">
+      <div class="titleBlock tilt" data-tilt>
+        <h1 class="title title--wow">VRH PROD</h1>
+        <div class="titleSheen" aria-hidden="true"></div>
       </div>
 
-      <p class="home-hint">
-        Appuie sur <span class="keycap inline">R</span>
-        <span class="keycap inline">I</span>
-        <span class="keycap inline">P</span>
-        ou choisis une rubrique.
-      </p>
+      <div class="glass glass--hint">
+        <div class="hintLine">
+          <span>Nav clavier :</span>
+          <span class="keycap keycap--sm">R</span>
+          <span class="keycap keycap--sm">I</span>
+          <span class="keycap keycap--sm">P</span>
+          <span class="dot">•</span>
+          <span class="keycap keycap--sm">H</span>
+          <span class="keycap keycap--sm">Esc</span>
+        </div>
+      </div>
 
-      <div class="gate-grid">
-        <a class="gate" href="./real-estate.html">
-          <div class="gate__scan"></div>
-          <div class="gate__water">R</div>
+      <div class="gateGrid" aria-label="Rubriques">
+        <a class="gate" href="./real-estate.html" data-k="R">
+          <div class="gate__scan" aria-hidden="true"></div>
+          <div class="gate__water" aria-hidden="true">R</div>
+          <div class="gate__top">
+            <span class="pill">Real Estate</span>
+            <span class="pill pill--ghost">R</span>
+          </div>
           <div class="gate__big">REAL ESTATE</div>
           <div class="gate__desc">Architecture réelle, narration visuelle.</div>
+          <div class="gate__arrow" aria-hidden="true">→</div>
         </a>
 
-        <a class="gate" href="./reels-interviews.html">
-          <div class="gate__scan"></div>
-          <div class="gate__water">I</div>
+        <a class="gate" href="./reels-interviews.html" data-k="I">
+          <div class="gate__scan" aria-hidden="true"></div>
+          <div class="gate__water" aria-hidden="true">I</div>
+          <div class="gate__top">
+            <span class="pill">Interviews</span>
+            <span class="pill pill--ghost">I</span>
+          </div>
           <div class="gate__big">INTERVIEWS</div>
           <div class="gate__desc">Paroles courtes. Impact direct.</div>
+          <div class="gate__arrow" aria-hidden="true">→</div>
         </a>
 
-        <a class="gate" href="./projets-independants.html">
-          <div class="gate__scan"></div>
-          <div class="gate__water">P</div>
+        <a class="gate" href="./projets-independants.html" data-k="P">
+          <div class="gate__scan" aria-hidden="true"></div>
+          <div class="gate__water" aria-hidden="true">P</div>
+          <div class="gate__top">
+            <span class="pill">Projets indé</span>
+            <span class="pill pill--ghost">P</span>
+          </div>
           <div class="gate__big">PROJETS INDÉ</div>
           <div class="gate__desc">Terrain d’expérimentation visuelle.</div>
+          <div class="gate__arrow" aria-hidden="true">→</div>
         </a>
       </div>
     </section>
