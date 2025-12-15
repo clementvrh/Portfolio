@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reels Interviews — Clément</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <a class="skip" href="#contenu">Aller au contenu</a>
+
+  <header class="header">
+    <div class="bar">
+      <a class="brand" href="./index.html">
+        <span class="brand__name">Clément</span><span class="badge">Portfolio</span>
+      </a>
+
+      <nav class="navlinks" aria-label="Navigation principale">
+        <a href="./real-estate.html">Real Estate</a>
+        <a href="./reels-interviews.html" aria-current="page">Reels Interviews</a>
+        <a href="./projets-independants.html">Projets indépendants</a>
+      </nav>
+
+      <button class="menuBtn" type="button" aria-expanded="false" aria-controls="menuPanel">Menu</button>
+    </div>
+
+    <div id="menuPanel" class="panel" data-open="false">
+      <a href="./real-estate.html">Real Estate</a>
+      <a href="./reels-interviews.html" aria-current="page">Reels Interviews</a>
+      <a href="./projets-independants.html">Projets indépendants</a>
+      <div class="small">Raccourcis : <b>1</b>/<b>2</b>/<b>3</b> · <b>H</b> · <b>Esc</b></div>
+    </div>
+  </header>
+
+  <main id="contenu" class="wrap">
+    <section class="hero">
+      <p class="kicker">Rubrique</p>
+      <h1>Reels Interviews</h1>
+      <p class="sub">Page prête. On pourra intégrer des embeds, des shorts, ou des modules “avant/après”.</p>
+      <div class="cta">
+        <a class="btn" href="./real-estate.html">← Real Estate</a>
+        <a class="btn primary" href="./projets-independants.html">Suivant : Indé</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="grid">
+        <div class="card">
+          <h2>Placeholder</h2>
+          <p>On pourra faire une liste de reels avec miniatures + tags (durée / rôle / client).</p>
+          <div class="meta"><span class="pill">Simple</span><span class="pill">Efficace</span></div>
+        </div>
+        <div class="card">
+          <h2>Placeholder</h2>
+          <p>Option : switch “Montage / Sous-titres / DA” pour filtrer tes items.</p>
+          <div class="meta"><span class="pill">Filtre</span></div>
+        </div>
+        <div class="card">
+          <h2>Placeholder</h2>
+          <p>Option : page ultra minimaliste si tu préfères une DA très éditoriale.</p>
+          <div class="meta"><span class="pill">Éditorial</span></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>© <span id="y"></span> Clément</div>
+      <div class="kbdhint">1/2/3 · H · Esc</div>
+    </footer>
+  </main>
+
+  <script>
+    document.getElementById("y").textContent = new Date().getFullYear();
+  </script>
+  <script src="./app.js"></script>
+</body>
+</html>

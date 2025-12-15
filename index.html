@@ -1,1 +1,96 @@
-<h1>Mon portfolio</h1>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clément — Portfolio</title>
+  <meta name="description" content="Portfolio — Real Estate, Reels Interviews, Projets indépendants." />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <a class="skip" href="#contenu">Aller au contenu</a>
+
+  <header class="header">
+    <div class="bar">
+      <a class="brand" href="./index.html" aria-label="Retour à l'accueil">
+        <span class="brand__name">Clément</span>
+        <span class="badge">Portfolio</span>
+      </a>
+
+      <nav class="navlinks" aria-label="Navigation principale">
+        <a href="./real-estate.html">Real Estate</a>
+        <a href="./reels-interviews.html">Reels Interviews</a>
+        <a href="./projets-independants.html">Projets indépendants</a>
+      </nav>
+
+      <button class="menuBtn" type="button" aria-expanded="false" aria-controls="menuPanel">
+        Menu
+      </button>
+    </div>
+
+    <div id="menuPanel" class="panel" data-open="false">
+      <a href="./real-estate.html">Real Estate</a>
+      <a href="./reels-interviews.html">Reels Interviews</a>
+      <a href="./projets-independants.html">Projets indépendants</a>
+      <div class="small">Raccourcis : <b>1</b>/<b>2</b>/<b>3</b> · <b>H</b> · <b>Esc</b></div>
+    </div>
+  </header>
+
+  <main id="contenu" class="wrap">
+    <section class="hero">
+      <p class="kicker">Direction artistique · vidéo · montage</p>
+      <h1>Un portfolio moderne, clair, et construit pas à pas.</h1>
+      <p class="sub">
+        Trois rubriques, trois pages. Sur desktop, navigation au clavier en bonus ; sur mobile, tout reste fluide au tap.
+      </p>
+
+      <div class="cta">
+        <a class="btn primary" href="./real-estate.html">Real Estate</a>
+        <a class="btn" href="./reels-interviews.html">Reels Interviews</a>
+        <a class="btn" href="./projets-independants.html">Projets indépendants</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="grid">
+        <a class="card" href="./real-estate.html">
+          <h2>Real Estate</h2>
+          <p>Image propre, rythme, angles, intention — focus sur l’efficacité visuelle.</p>
+          <div class="meta">
+            <span class="pill">Touche 1</span>
+            <span class="pill">Entrée</span>
+          </div>
+        </a>
+
+        <a class="card" href="./reels-interviews.html">
+          <h2>Reels Interviews</h2>
+          <p>Vertical, montage, sous-titres, punchlines — une énergie courte et nette.</p>
+          <div class="meta">
+            <span class="pill">Touche 2</span>
+            <span class="pill">Entrée</span>
+          </div>
+        </a>
+
+        <a class="card" href="./projets-independants.html">
+          <h2>Projets indépendants</h2>
+          <p>Expérimentations, collabs, projets perso — la partie “lab”.</p>
+          <div class="meta">
+            <span class="pill">Touche 3</span>
+            <span class="pill">Entrée</span>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>© <span id="y"></span> Clément</div>
+      <div class="kbdhint">Bonus clavier : <b>1</b>/<b>2</b>/<b>3</b> · <b>H</b> · <b>Esc</b></div>
+    </footer>
+  </main>
+
+  <script>
+    document.getElementById("y").textContent = new Date().getFullYear();
+  </script>
+  <script src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Real Estate — Clément</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <a class="skip" href="#contenu">Aller au contenu</a>
+
+  <header class="header">
+    <div class="bar">
+      <a class="brand" href="./index.html">
+        <span class="brand__name">Clément</span><span class="badge">Portfolio</span>
+      </a>
+
+      <nav class="navlinks" aria-label="Navigation principale">
+        <a href="./real-estate.html" aria-current="page">Real Estate</a>
+        <a href="./reels-interviews.html">Reels Interviews</a>
+        <a href="./projets-independants.html">Projets indépendants</a>
+      </nav>
+
+      <button class="menuBtn" type="button" aria-expanded="false" aria-controls="menuPanel">Menu</button>
+    </div>
+
+    <div id="menuPanel" class="panel" data-open="false">
+      <a href="./real-estate.html" aria-current="page">Real Estate</a>
+      <a href="./reels-interviews.html">Reels Interviews</a>
+      <a href="./projets-independants.html">Projets indépendants</a>
+      <div class="small">Raccourcis : <b>1</b>/<b>2</b>/<b>3</b> · <b>H</b> · <b>Esc</b></div>
+    </div>
+  </header>
+
+  <main id="contenu" class="wrap">
+    <section class="hero">
+      <p class="kicker">Rubrique</p>
+      <h1>Real Estate</h1>
+      <p class="sub">Page prête. On ajoutera tes projets/médias ensuite, sans toucher à la structure.</p>
+      <div class="cta">
+        <a class="btn" href="./index.html">← Accueil</a>
+        <a class="btn primary" href="./reels-interviews.html">Suivant : Reels</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="grid">
+        <div class="card">
+          <h2>Placeholder</h2>
+          <p>Grille de projets, vidéo hero, ou liste minimaliste — on choisira plus tard.</p>
+          <div class="meta"><span class="pill">Responsive OK</span><span class="pill">Clean</span></div>
+        </div>
+        <div class="card">
+          <h2>Placeholder</h2>
+          <p>On pourra ajouter des images avec lazy-load pour garder le site rapide.</p>
+          <div class="meta"><span class="pill">Perf</span></div>
+        </div>
+        <div class="card">
+          <h2>Placeholder</h2>
+          <p>Option : sections plein écran / scroll snap si tu veux un effet éditorial.</p>
+          <div class="meta"><span class="pill">Option</span></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>© <span id="y"></span> Clément</div>
+      <div class="kbdhint">1/2/3 · H · Esc</div>
+    </footer>
+  </main>
+
+  <script>
+    document.getElementById("y").textContent = new Date().getFullYear();
+  </script>
+  <script src="./app.js"></script>
+</body>
+</html>
