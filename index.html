@@ -1,96 +1,77 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Clément — Portfolio</title>
-  <meta name="description" content="Portfolio — Real Estate, Reels Interviews, Projets indépendants." />
-  <link rel="stylesheet" href="./style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VRH PROD</title>
+  <link rel="stylesheet" href="./style.css">
 </head>
-<body>
-  <a class="skip" href="#contenu">Aller au contenu</a>
 
+<body data-page="home">
+  <div class="cursor-dot"></div>
+  <div class="page-transition"></div>
+
+  <!-- HEADER -->
   <header class="header">
-    <div class="bar">
-      <a class="brand" href="./index.html" aria-label="Retour à l'accueil">
-        <span class="brand__name">Clément</span>
-        <span class="badge">Portfolio</span>
-      </a>
+    <div class="hotkeys">
+      <div class="hotkeys__inner">
+        <div class="hotkeys__left">
+          <span class="hotkey"><span class="keycap">R</span>Real Estate</span>
+          <span class="hotkey"><span class="keycap">I</span>Interviews</span>
+          <span class="hotkey"><span class="keycap">P</span>Projets indé</span>
+        </div>
 
-      <nav class="navlinks" aria-label="Navigation principale">
-        <a href="./real-estate.html">Real Estate</a>
-        <a href="./reels-interviews.html">Reels Interviews</a>
-        <a href="./projets-independants.html">Projets indépendants</a>
-      </nav>
+        <a href="./index.html" class="brand">
+          <img src="./vrh-logo.png" alt="VRH PROD">
+        </a>
 
-      <button class="menuBtn" type="button" aria-expanded="false" aria-controls="menuPanel">
-        Menu
-      </button>
-    </div>
-
-    <div id="menuPanel" class="panel" data-open="false">
-      <a href="./real-estate.html">Real Estate</a>
-      <a href="./reels-interviews.html">Reels Interviews</a>
-      <a href="./projets-independants.html">Projets indépendants</a>
-      <div class="small">Raccourcis : <b>1</b>/<b>2</b>/<b>3</b> · <b>H</b> · <b>Esc</b></div>
+        <div class="hotkeys__right">
+          <span class="hotkey"><span class="keycap">H</span>Home</span>
+          <span class="hotkey"><span class="keycap">Esc</span>Close</span>
+        </div>
+      </div>
     </div>
   </header>
 
-  <main id="contenu" class="wrap">
+  <!-- MAIN -->
+  <main class="wrap wrap--home">
     <section class="hero">
-      <p class="kicker">Direction artistique · vidéo · montage</p>
-      <h1>Un portfolio moderne, clair, et construit pas à pas.</h1>
-      <p class="sub">
-        Trois rubriques, trois pages. Sur desktop, navigation au clavier en bonus ; sur mobile, tout reste fluide au tap.
+      <div class="tilt" data-tilt>
+        <h1 class="title-glow">VRH PROD</h1>
+      </div>
+
+      <p class="home-hint">
+        Appuie sur <span class="keycap inline">R</span>
+        <span class="keycap inline">I</span>
+        <span class="keycap inline">P</span>
+        ou choisis une rubrique.
       </p>
 
-      <div class="cta">
-        <a class="btn primary" href="./real-estate.html">Real Estate</a>
-        <a class="btn" href="./reels-interviews.html">Reels Interviews</a>
-        <a class="btn" href="./projets-independants.html">Projets indépendants</a>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="grid">
-        <a class="card" href="./real-estate.html">
-          <h2>Real Estate</h2>
-          <p>Image propre, rythme, angles, intention — focus sur l’efficacité visuelle.</p>
-          <div class="meta">
-            <span class="pill">Touche 1</span>
-            <span class="pill">Entrée</span>
-          </div>
+      <div class="gate-grid">
+        <a class="gate" href="./real-estate.html">
+          <div class="gate__scan"></div>
+          <div class="gate__water">R</div>
+          <div class="gate__big">REAL ESTATE</div>
+          <div class="gate__desc">Architecture réelle, narration visuelle.</div>
         </a>
 
-        <a class="card" href="./reels-interviews.html">
-          <h2>Reels Interviews</h2>
-          <p>Vertical, montage, sous-titres, punchlines — une énergie courte et nette.</p>
-          <div class="meta">
-            <span class="pill">Touche 2</span>
-            <span class="pill">Entrée</span>
-          </div>
+        <a class="gate" href="./reels-interviews.html">
+          <div class="gate__scan"></div>
+          <div class="gate__water">I</div>
+          <div class="gate__big">INTERVIEWS</div>
+          <div class="gate__desc">Paroles courtes. Impact direct.</div>
         </a>
 
-        <a class="card" href="./projets-independants.html">
-          <h2>Projets indépendants</h2>
-          <p>Expérimentations, collabs, projets perso — la partie “lab”.</p>
-          <div class="meta">
-            <span class="pill">Touche 3</span>
-            <span class="pill">Entrée</span>
-          </div>
+        <a class="gate" href="./projets-independants.html">
+          <div class="gate__scan"></div>
+          <div class="gate__water">P</div>
+          <div class="gate__big">PROJETS INDÉ</div>
+          <div class="gate__desc">Terrain d’expérimentation visuelle.</div>
         </a>
       </div>
     </section>
-
-    <footer class="footer">
-      <div>© <span id="y"></span> Clément</div>
-      <div class="kbdhint">Bonus clavier : <b>1</b>/<b>2</b>/<b>3</b> · <b>H</b> · <b>Esc</b></div>
-    </footer>
   </main>
 
-  <script>
-    document.getElementById("y").textContent = new Date().getFullYear();
-  </script>
   <script src="./app.js"></script>
 </body>
 </html>
