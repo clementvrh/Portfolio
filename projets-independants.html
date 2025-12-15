@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Projets indépendants — Clément</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <a class="skip" href="#contenu">Aller au contenu</a>
+
+  <header class="header">
+    <div class="bar">
+      <a class="brand" href="./index.html">
+        <span class="brand__name">Clément</span><span class="badge">Portfolio</span>
+      </a>
+
+      <nav class="navlinks" aria-label="Navigation principale">
+        <a href="./real-estate.html">Real Estate</a>
+        <a href="./reels-interviews.html">Reels Interviews</a>
+        <a href="./projets-independants.html" aria-current="page">Projets indépendants</a>
+      </nav>
+
+      <button class="menuBtn" type="button" aria-expanded="false" aria-controls="menuPanel">Menu</button>
+    </div>
+
+    <div id="menuPanel" class="panel" data-open="false">
+      <a href="./real-estate.html">Real Estate</a>
+      <a href="./reels-interviews.html">Reels Interviews</a>
+      <a href="./projets-independants.html" aria-current="page">Projets indépendants</a>
+      <div class="small">Raccourcis : <b>1</b>/<b>2</b>/<b>3</b> · <b>H</b> · <b>Esc</b></div>
+    </div>
+  </header>
+
+  <main id="contenu" class="wrap">
+    <section class="hero">
+      <p class="kicker">Rubrique</p>
+      <h1>Projets indépendants</h1>
+      <p class="sub">Page prête. Ici on pourra mettre tes projets perso (ou juste une sélection très courte).</p>
+      <div class="cta">
+        <a class="btn" href="./reels-interviews.html">← Reels</a>
+        <a class="btn primary" href="./index.html">Retour accueil</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="grid">
+        <div class="card">
+          <h2>Placeholder</h2>
+          <p>Format “case study” court : objectif → action → résultat (3 lignes).</p>
+          <div class="meta"><span class="pill">Story</span><span class="pill">Clair</span></div>
+        </div>
+        <div class="card">
+          <h2>Placeholder</h2>
+          <p>Option : “notes” / inspirations / experiments (si tu veux un côté journal).</p>
+          <div class="meta"><span class="pill">Journal</span></div>
+        </div>
+        <div class="card">
+          <h2>Placeholder</h2>
+          <p>Option : page très minimaliste avec 5 liens max — ultra premium.</p>
+          <div class="meta"><span class="pill">Minimal</span></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>© <span id="y"></span> Clément</div>
+      <div class="kbdhint">1/2/3 · H · Esc</div>
+    </footer>
+  </main>
+
+  <script>
+    document.getElementById("y").textContent = new Date().getFullYear();
+  </script>
+  <script src="./app.js"></script>
+</body>
+</html>
