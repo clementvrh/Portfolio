@@ -34,10 +34,10 @@
 
   setActiveKey();
 
-  // Keyboard shortcuts
   const isTyping = (el) =>
     el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
 
+  // Keyboard shortcuts
   document.addEventListener("keydown", (e) => {
     if (isTyping(document.activeElement)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -54,17 +54,31 @@
     }
   });
 
-  // Click: smooth internal nav with transition
+  // Click: smooth internal nav with transition (ignore mailto/external)
   document.addEventListener("click", (e) => {
     const a = e.target.closest("a");
     if (!a) return;
+
     const href = a.getAttribute("href");
     if (!href) return;
+
+    // Ignore mailto, tel, external
+    if (href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("http")) return;
+
     if (href.startsWith("./") || href.endsWith(".html")) {
       e.preventDefault();
       navigate(href);
     }
   });
+
+  // Contact glow on click
+  const contact = document.querySelector(".contactBtn");
+  if (contact) {
+    contact.addEventListener("click", () => {
+      contact.classList.add("is-glow");
+      setTimeout(() => contact.classList.remove("is-glow"), 320);
+    });
+  }
 
   // Cursor dot (desktop)
   const dot = document.querySelector(".cursor-dot");
@@ -104,7 +118,7 @@
     window.addEventListener("mouseleave", reset);
   }
 
-  // Sliders (Real / Reels): arrows + counter + focus + ← →
+  // Sliders: arrows + counter + focus + ← → + infinite wrap
   function setupSlider(name) {
     const rail = document.getElementById(`rail-${name}`);
     if (!rail) return;
@@ -115,8 +129,9 @@
     if (totalEl) totalEl.textContent = String(slides.length).padStart(2, "0");
 
     const scrollToIndex = (idx) => {
-      const i = Math.max(0, Math.min(slides.length - 1, idx));
-      slides[i].scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+      const n = slides.length;
+      const wrapped = ((idx % n) + n) % n; // infinite wrap
+      slides[wrapped].scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
     };
 
     const update = () => {
@@ -149,7 +164,6 @@
       if (isTyping(document.activeElement)) return;
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
 
-      // uniquement quand on est sur la page concernée
       const page = document.body.getAttribute("data-page");
       const ok = (name === "real" && page === "real") || (name === "reels" && page === "reels");
       if (!ok) return;
