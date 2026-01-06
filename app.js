@@ -83,8 +83,10 @@
   // Cursor dot (desktop)
   const dot = document.querySelector(".cursor-dot");
   if (dot && !isCoarse) {
-    let x = window.innerWidth / 2, y = window.innerHeight / 2;
-    let tx = x, ty = y;
+    let x = window.innerWidth / 2,
+      y = window.innerHeight / 2;
+    let tx = x,
+      ty = y;
 
     window.addEventListener("mousemove", (ev) => {
       tx = ev.clientX;
@@ -113,7 +115,8 @@
       const ry = clamp((px - 0.5) * 12, -10, 10);
       tilt.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg)`;
     };
-    const reset = () => (tilt.style.transform = "perspective(900px) rotateX(0deg) rotateY(0deg)");
+    const reset = () =>
+      (tilt.style.transform = "perspective(900px) rotateX(0deg) rotateY(0deg)");
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseleave", reset);
   }
@@ -136,12 +139,16 @@
 
     const update = () => {
       const railRect = rail.getBoundingClientRect();
-      let best = 0, bestDist = Infinity;
+      let best = 0,
+        bestDist = Infinity;
 
       slides.forEach((s, i) => {
         const r = s.getBoundingClientRect();
         const dist = Math.abs(r.left - railRect.left);
-        if (dist < bestDist) { bestDist = dist; best = i; }
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = i;
+        }
       });
 
       if (nowEl) nowEl.textContent = String(best + 1).padStart(2, "0");
