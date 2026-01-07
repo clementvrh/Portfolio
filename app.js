@@ -56,10 +56,8 @@
 
   const dot = document.querySelector(".cursor-dot");
   if (dot && !isCoarse) {
-    let x = innerWidth / 2,
-      y = innerHeight / 2;
-    let tx = x,
-      ty = y;
+    let x = innerWidth / 2, y = innerHeight / 2;
+    let tx = x, ty = y;
 
     addEventListener("mousemove", (e) => {
       tx = e.clientX;
@@ -77,10 +75,57 @@
   }
 
   /* ======================
+     MOBILE: VIDEO SHIELD
+     - Without this, YouTube iframes eat the touch events on mobile
+     - Shield captures swipe
+     - Tap unlocks video for a few seconds to allow interaction
+  ====================== */
+
+  function setupVideoShields() {
+    if (!isCoarse) return;
+
+    document.querySelectorAll(".video").forEach((wrap) => {
+      if (wrap.dataset.shielded === "1") return;
+      wrap.dataset.shielded = "1";
+
+      const shield = document.createElement("div");
+      shield.className = "videoShield";
+      shield.setAttribute("aria-hidden", "true");
+      wrap.appendChild(shield);
+
+      let moved = false;
+      let downX = 0;
+      let downY = 0;
+
+      shield.addEventListener("pointerdown", (e) => {
+        moved = false;
+        downX = e.clientX;
+        downY = e.clientY;
+      });
+
+      shield.addEventListener("pointermove", (e) => {
+        const dx = Math.abs(e.clientX - downX);
+        const dy = Math.abs(e.clientY - downY);
+        if (dx > 6 || dy > 6) moved = true;
+      });
+
+      // Tap = unlock iframe temporarily
+      shield.addEventListener("pointerup", () => {
+        if (moved) return;
+        wrap.classList.add("is-unlocked");
+        clearTimeout(wrap._unlockT);
+        wrap._unlockT = setTimeout(() => {
+          wrap.classList.remove("is-unlocked");
+        }, 4500);
+      });
+    });
+  }
+
+  /* ======================
      INFINITE CAROUSEL (TRANSFORM-BASED)
-     - Works on iOS/Android/Desktop
-     - True infinite left/right
-     - Starts on 1/n (first slide)
+     - Smooth (no cheap bounce)
+     - Infinite left/right
+     - Starts on first slide
      - Any number of slides
   ====================== */
 
@@ -93,53 +138,49 @@
     const nowEl = document.getElementById(`${name}Now`);
     const totalEl = document.getElementById(`${name}Total`);
 
-    // original slides = direct children (article.slide)
     const originals = Array.from(rail.children);
     const n = originals.length;
     if (!n) return;
 
     if (totalEl) totalEl.textContent = String(n).padStart(2, "0");
 
-    // Build track
+    // Track wrapper
     const track = document.createElement("div");
     track.className = "rail__track";
 
-    // Move originals into track (middle set B)
+    // Move originals into track (middle set)
     originals.forEach((el) => track.appendChild(el));
+    const setB = Array.from(track.children);
 
-    // Clone A and C from the originals we just moved
-    const setB = Array.from(track.children); // n slides
-
+    // Clone A + C
     const fragA = document.createDocumentFragment();
+    const fragC = document.createDocumentFragment();
+
     setB.forEach((el) => {
       const c = el.cloneNode(true);
       c.classList.add("is-dup");
       fragA.appendChild(c);
     });
-
-    const fragC = document.createDocumentFragment();
     setB.forEach((el) => {
       const c = el.cloneNode(true);
       c.classList.add("is-dup");
       fragC.appendChild(c);
     });
 
-    // Rebuild track = A + B + C
     track.innerHTML = "";
     track.appendChild(fragA);
     setB.forEach((el) => track.appendChild(el));
     track.appendChild(fragC);
 
-    // Replace rail content
     rail.innerHTML = "";
     rail.appendChild(track);
 
     const slides = Array.from(track.children); // 3n
 
-    // Measurements
+    // Metrics
     let gap = 22;
     let cardW = 360;
-    let step = 382; // cardW + gap
+    let step = 382;
     let setW = 0;
 
     const viewportW = () => rail.getBoundingClientRect().width;
@@ -159,11 +200,9 @@
     // State
     let x = 0;
     let targetX = 0;
-    let vel = 0;
     let dragging = false;
     let startPX = 0;
     let startTarget = 0;
-
     let realIndex = 0;
 
     function clampReal(r) {
@@ -173,7 +212,6 @@
     }
 
     function posForRealIndex(r) {
-      // slide in middle set = (n + r) * step
       const slideLeft = (n + r) * step;
       return -(slideLeft - centerOffset());
     }
@@ -187,7 +225,7 @@
     }
 
     function recenterIfNeeded() {
-      const p = -x; // track position
+      const p = -x;
       const min = step * (n * 0.35);
       const max = step * (n * 1.65);
 
@@ -200,13 +238,15 @@
       }
     }
 
+    // ✅ Smooth without bounce (no spring overshoot)
     function render() {
-      const diff = targetX - x;
-      vel = vel * 0.82 + diff * 0.18;
-      x += vel;
+      const ease = dragging ? 0.22 : 0.14;
+      x += (targetX - x) * ease;
+
+      // stop micro-jitter near target
+      if (Math.abs(targetX - x) < 0.02) x = targetX;
 
       recenterIfNeeded();
-
       track.style.transform = `translate3d(${x}px,0,0)`;
       requestAnimationFrame(render);
     }
@@ -218,7 +258,6 @@
       if (!smooth) {
         x = px;
         targetX = px;
-        vel = 0;
       } else {
         targetX = px;
       }
@@ -231,13 +270,12 @@
       goTo(r, true);
     }
 
-    // Pointer drag (touch + mouse)
+    // Drag
     rail.addEventListener("pointerdown", (e) => {
       dragging = true;
       rail.setPointerCapture(e.pointerId);
       startPX = e.clientX;
       startTarget = targetX;
-      vel = 0;
       rail.classList.add("is-dragging");
     });
 
@@ -258,13 +296,14 @@
     rail.addEventListener("pointercancel", endDrag);
     rail.addEventListener("lostpointercapture", endDrag);
 
-    // Wheel support on desktop
+    // Wheel (desktop)
     rail.addEventListener(
       "wheel",
       (e) => {
         e.preventDefault();
         const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
         targetX -= delta;
+
         if (rail._snapT) clearTimeout(rail._snapT);
         rail._snapT = setTimeout(() => snapToNearest(), 140);
       },
@@ -279,7 +318,7 @@
       });
     });
 
-    // Keyboard arrows (only on the correct page)
+    // Keyboard arrows (only on correct page)
     document.addEventListener("keydown", (e) => {
       const page = document.body.getAttribute("data-page");
       const ok = (name === "real" && page === "real") || (name === "reels" && page === "reels");
@@ -289,7 +328,6 @@
       if (e.key === "ArrowLeft") goTo(realIndex - 1, true);
     });
 
-    // Init (after layout settles)
     const init = () => {
       measure();
       goTo(0, false); // start at 1/n
@@ -305,6 +343,7 @@
     requestAnimationFrame(render);
   }
 
+  setupVideoShields();
   setupTransformCarousel("real");
   setupTransformCarousel("reels");
 })();

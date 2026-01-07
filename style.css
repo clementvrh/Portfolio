@@ -118,7 +118,7 @@ a{color:inherit;text-decoration:none}
   justify-content:flex-end;
 }
 
-/* contact */
+/* contact (fix vertical centering) */
 .contactBtn{
   height:34px;
   padding:0 14px;
@@ -127,6 +127,12 @@ a{color:inherit;text-decoration:none}
   background: rgba(255,255,255,.06);
   font-weight:800;
   letter-spacing:.02em;
+
+  display:inline-flex;            /* ✅ */
+  align-items:center;             /* ✅ */
+  justify-content:center;         /* ✅ */
+  line-height:34px;               /* ✅ */
+
   position:relative;
   overflow:hidden;
 }
@@ -156,6 +162,17 @@ a{color:inherit;text-decoration:none}
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   backdrop-filter: blur(12px);
+}
+
+/* ✅ Fix title doubling: hide screen-reader text properly */
+.sr-only{
+  position:absolute !important;
+  width:1px;height:1px;
+  padding:0;margin:-1px;
+  overflow:hidden;
+  clip:rect(0,0,0,0);
+  white-space:nowrap;
+  border:0;
 }
 
 /* ================= HOME ================= */
@@ -350,19 +367,17 @@ a{color:inherit;text-decoration:none}
 }
 .counter .muted{color:rgba(245,246,255,.55)}
 
-/* ✅ Transform-based carousel viewport */
+/* Transform carousel viewport */
 .rail{
   --cardW: clamp(280px, 34vw, 420px);
   position:relative;
   overflow:hidden;
   padding:10px 0 14px;
-  touch-action: pan-y;
+  touch-action: pan-y; /* allow horizontal pointer tracking + page vertical scroll */
   -webkit-mask-image:linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
           mask-image:linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
   user-select:none;
 }
-
-.rail.is-dragging{ cursor: grabbing; }
 
 .rail__track{
   display:flex;
@@ -386,6 +401,7 @@ a{color:inherit;text-decoration:none}
 }
 
 .video{
+  position:relative;
   border-radius:18px;
   overflow:hidden;
   border:1px solid rgba(255,255,255,.12);
@@ -394,6 +410,22 @@ a{color:inherit;text-decoration:none}
 .video iframe{width:100%;height:100%;border:0;display:block}
 .video--v{aspect-ratio:9/16;max-height:72vh}
 
+/* ✅ Mobile shield to make swipe work over YouTube iframes */
+.videoShield{
+  position:absolute;
+  inset:0;
+  background:transparent;
+  z-index:2;
+}
+.video.is-unlocked .videoShield{ display:none; }
+
+/* On mobile, allow interaction only when unlocked */
+@media (pointer: coarse){
+  .video iframe{ pointer-events:none; }
+  .video.is-unlocked iframe{ pointer-events:auto; }
+}
+
+/* small */
 @media (max-width:760px){
   .brand__logo{width:46px;height:46px}
 }
