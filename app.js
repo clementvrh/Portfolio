@@ -1,10 +1,6 @@
 (function () {
   const isCoarse = window.matchMedia("(pointer: coarse)").matches;
 
-  /* =========================
-     PAGE TRANSITION + HOTKEYS
-     ========================= */
-
   const transition = document.querySelector(".page-transition");
   const hotkeyEl = (k) => document.querySelector(`.hotkey[data-key="${k}"]`);
 
@@ -74,10 +70,7 @@
     });
   }
 
-  /* =========================
-     CURSOR DOT
-     ========================= */
-
+  /* cursor dot */
   const dot = document.querySelector(".cursor-dot");
   if (dot && !isCoarse) {
     let x = window.innerWidth / 2;
@@ -100,77 +93,64 @@
     requestAnimationFrame(tick);
   }
 
-  /* =========================
-     INFINITE CAROUSEL SLIDER
-     - starts at 1/4 (center)
-     - center snap
-     - neighbors visible
-     - seamless loop (no visible jump)
-     ========================= */
+  /* ===== Infinite carousel (true loop, smooth) ===== */
 
-  function setupInfiniteCarousel(name) {
+  function setupCarousel(name) {
     const rail = document.getElementById(`rail-${name}`);
     if (!rail) return;
-
-    // Prevent double init
     if (rail.dataset.inited === "1") return;
     rail.dataset.inited = "1";
 
     const nowEl = document.getElementById(`${name}Now`);
     const totalEl = document.getElementById(`${name}Total`);
 
-    // Original slides (before clones)
     const originals = Array.from(rail.children);
-    const total = originals.length;
-    if (totalEl) totalEl.textContent = String(total).padStart(2, "0");
-    if (total < 2) return;
+    const n = originals.length;
+    if (!n) return;
 
-    // Clone last to head, first to tail
-    const firstClone = originals[0].cloneNode(true);
-    const lastClone = originals[total - 1].cloneNode(true);
-    firstClone.classList.add("is-clone");
-    lastClone.classList.add("is-clone");
+    if (totalEl) totalEl.textContent = String(n).padStart(2, "0");
 
-    rail.insertBefore(lastClone, originals[0]);
-    rail.appendChild(firstClone);
+    // Build: [clone set A] + [original set B] + [clone set C]
+    const fragA = document.createDocumentFragment();
+    const fragC = document.createDocumentFragment();
 
-    const slides = Array.from(rail.children);
+    originals.forEach((node) => {
+      const c = node.cloneNode(true);
+      c.classList.add("is-dup");
+      fragC.appendChild(c);
+    });
 
-    // Index in "slides" array (with clones). Real first = 1
-    let index = 1;
+    originals.forEach((node) => {
+      const c = node.cloneNode(true);
+      c.classList.add("is-dup");
+      fragA.appendChild(c);
+    });
+
+    // prepend A
+    rail.insertBefore(fragA, rail.firstChild);
+    // append C
+    rail.appendChild(fragC);
+
+    const slides = Array.from(rail.children); // length = 3n
+    const startIndex = n; // first slide of middle set (B)
+
+    let index = startIndex;
     let jumping = false;
 
     const disableSnap = () => rail.classList.add("is-jumping");
     const enableSnap = () => rail.classList.remove("is-jumping");
 
     const scrollToIndex = (i, smooth = true) => {
-      const target = slides[i];
-      if (!target) return;
-
-      const left = target.offsetLeft - rail.offsetLeft;
+      const t = slides[i];
+      if (!t) return;
+      const left = t.offsetLeft - rail.offsetLeft;
       rail.scrollTo({ left, behavior: smooth ? "smooth" : "auto" });
-    };
-
-    const setUI = () => {
-      // current slide class (visual)
-      slides.forEach((s) => s.classList.remove("is-current"));
-      slides[index]?.classList.add("is-current");
-      rail.classList.add("is-focusing");
-
-      // counter: map clones back to real
-      let real = index - 1; // because index=1 => real 0
-      if (real < 0) real = total - 1;
-      if (real >= total) real = 0;
-
-      if (nowEl) nowEl.textContent = String(real + 1).padStart(2, "0");
     };
 
     const hardJump = (i) => {
       jumping = true;
       disableSnap();
       scrollToIndex(i, false);
-
-      // re-enable snap next paint
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           enableSnap();
@@ -180,12 +160,16 @@
       });
     };
 
-    // Initial position MUST be after layout
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        hardJump(1); // start on first real slide => 1/4
-      });
-    });
+    const realFromIndex = (i) => ((i % n) + n) % n;
+
+    const setUI = () => {
+      const real = realFromIndex(index);
+      if (nowEl) nowEl.textContent = String(real + 1).padStart(2, "0");
+
+      rail.classList.add("is-focusing");
+      slides.forEach((s) => s.classList.remove("is-current"));
+      slides[index]?.classList.add("is-current");
+    };
 
     const closestIndex = () => {
       const cur = rail.scrollLeft;
@@ -201,28 +185,52 @@
       return best;
     };
 
+    // Start centered at 1/4 (real 1) in the MIDDLE set
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        index = startIndex; // real 1/4
+        hardJump(index);
+      });
+    });
+
+    // Recenter if user drifts into A or C (keeps infinite illusion)
+    const recenterIfNeeded = () => {
+      // If we are too far in A (left set), add n to bring back to middle
+      if (index < n * 0.5) {
+        index += n;
+        hardJump(index);
+      }
+      // If we are too far in C (right set), subtract n
+      if (index > n * 2.5) {
+        index -= n;
+        hardJump(index);
+      }
+    };
+
     let raf = 0;
+    let endTimer = null;
+
     const onScroll = () => {
       if (jumping) return;
+
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         index = closestIndex();
         setUI();
 
-        // Seamless loop
-        if (index === 0) {
-          // at head clone (last)
-          hardJump(total);
-        } else if (index === slides.length - 1) {
-          // at tail clone (first)
-          hardJump(1);
-        }
+        // Debounced "scroll end" => recenter invisibly when momentum stops
+        if (endTimer) clearTimeout(endTimer);
+        endTimer = setTimeout(() => {
+          if (jumping) return;
+          recenterIfNeeded();
+        }, 110);
       });
     };
 
     rail.addEventListener("scroll", onScroll, { passive: true });
+    setUI();
 
-    // Arrow buttons
+    // arrows
     document.querySelectorAll(`.arrowBtn[data-slider="${name}"]`).forEach((btn) => {
       btn.addEventListener("click", () => {
         const dir = Number(btn.dataset.dir || 1);
@@ -231,10 +239,9 @@
       });
     });
 
-    // Keyboard arrows
+    // keyboard
     document.addEventListener("keydown", (e) => {
       if (isTyping(document.activeElement)) return;
-
       const page = document.body.getAttribute("data-page");
       const ok = (name === "real" && page === "real") || (name === "reels" && page === "reels");
       if (!ok) return;
@@ -248,11 +255,8 @@
         scrollToIndex(index, true);
       }
     });
-
-    // First UI state
-    setUI();
   }
 
-  setupInfiniteCarousel("real");
-  setupInfiniteCarousel("reels");
+  setupCarousel("real");
+  setupCarousel("reels");
 })();
