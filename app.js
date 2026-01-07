@@ -1,6 +1,5 @@
 (function () {
   const isCoarse = window.matchMedia("(pointer: coarse)").matches;
-
   const transition = document.querySelector(".page-transition");
 
   const setActiveKey = () => {
@@ -13,9 +12,6 @@
     if (page === "inde") hotkeyEl("p")?.classList.add("is-active");
   };
   setActiveKey();
-
-  const isTyping = (el) =>
-    el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
 
   const navigate = (url) => {
     if (transition) {
@@ -32,7 +28,7 @@
     const href = a.getAttribute("href");
     if (!href) return;
     if (href.startsWith("mailto:") || href.startsWith("http")) return;
-    if (href.endsWith(".html")) {
+    if (href.endsWith(".html") || href.includes(".html?")) {
       e.preventDefault();
       navigate(href);
     }
@@ -46,6 +42,7 @@
     });
   }
 
+  // Cursor dot (desktop)
   const dot = document.querySelector(".cursor-dot");
   if (dot && !isCoarse) {
     let x = window.innerWidth / 2;
@@ -68,10 +65,17 @@
     requestAnimationFrame(tick);
   }
 
-  /* ===== Infinite Carousel (3 full sets) =====
-     This is smooth on mobile AND desktop because we never "teleport" from 1->4.
-     We just recenter invisibly when we drift too far.
-  */
+  const isTyping = (el) =>
+    el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+
+  /* =========================
+     INFINITE CAROUSEL (SMOOTH)
+     - 3 sets: A (clone) + B (original) + C (clone)
+     - wrap by adjusting scrollLeft (no visible jump)
+     - current slide = closest to rail center
+     - order = EXACTLY your HTML order
+     ========================= */
+
   function setupCarousel(name) {
     const rail = document.getElementById(`rail-${name}`);
     if (!rail) return;
@@ -87,6 +91,7 @@
 
     if (totalEl) totalEl.textContent = String(n).padStart(2, "0");
 
+    // A + B + C
     const fragA = document.createDocumentFragment();
     const fragC = document.createDocumentFragment();
 
@@ -95,7 +100,6 @@
       c.classList.add("is-dup");
       fragA.appendChild(c);
     });
-
     originals.forEach((node) => {
       const c = node.cloneNode(true);
       c.classList.add("is-dup");
@@ -105,54 +109,32 @@
     rail.insertBefore(fragA, rail.firstChild);
     rail.appendChild(fragC);
 
-    const slides = Array.from(rail.children); // 3n
-    const startIndex = n; // first slide of middle set => 1/4
-
-    let index = startIndex;
-    let jumping = false;
-
-    const disableSnap = () => rail.classList.add("is-jumping");
-    const enableSnap = () => rail.classList.remove("is-jumping");
-
-    const leftForIndex = (i) => slides[i].offsetLeft - rail.offsetLeft;
-
-    const scrollToIndex = (i, smooth = true) => {
-      rail.scrollTo({ left: leftForIndex(i), behavior: smooth ? "smooth" : "auto" });
-    };
-
-    const hardJump = (i) => {
-      jumping = true;
-      disableSnap();
-      scrollToIndex(i, false);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          enableSnap();
-          jumping = false;
-          setUI();
-        });
-      });
-    };
+    let slides = Array.from(rail.children); // 3n
 
     const realFromIndex = (i) => {
       const r = i % n;
       return r < 0 ? r + n : r;
     };
 
-    const setUI = () => {
-      rail.classList.add("is-focusing");
-      slides.forEach((s) => s.classList.remove("is-current"));
-      slides[index]?.classList.add("is-current");
-
-      const real = realFromIndex(index);
-      if (nowEl) nowEl.textContent = String(real + 1).padStart(2, "0");
+    const scrollToIndex = (i, smooth = true) => {
+      const t = slides[i];
+      if (!t) return;
+      const left = t.offsetLeft - rail.offsetLeft;
+      rail.scrollTo({ left, behavior: smooth ? "smooth" : "auto" });
     };
 
-    const closestIndex = () => {
-      const cur = rail.scrollLeft;
+    const slideCenterX = (el) => {
+      const r = el.getBoundingClientRect();
+      return r.left + r.width / 2;
+    };
+
+    const getClosestToCenter = () => {
+      const rr = rail.getBoundingClientRect();
+      const cx = rr.left + rr.width / 2;
       let best = 0;
       let bestDist = Infinity;
       for (let i = 0; i < slides.length; i++) {
-        const d = Math.abs(leftForIndex(i) - cur);
+        const d = Math.abs(slideCenterX(slides[i]) - cx);
         if (d < bestDist) {
           bestDist = d;
           best = i;
@@ -161,57 +143,68 @@
       return best;
     };
 
-    // Start at 1/4
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        index = startIndex;
-        hardJump(index);
-      });
-    });
+    const setUI = (idx) => {
+      rail.classList.add("is-focusing");
+      slides.forEach((s) => s.classList.remove("is-current"));
+      slides[idx]?.classList.add("is-current");
 
-    // Recenter early enough so desktop never hits the end.
-    const recenterIfNeeded = () => {
-      if (index < n * 0.7) {
-        index += n;
-        hardJump(index);
-      } else if (index > n * 2.3) {
-        index -= n;
-        hardJump(index);
+      const real = realFromIndex(idx);
+      if (nowEl) nowEl.textContent = String(real + 1).padStart(2, "0");
+    };
+
+    const getSetWidth = () => {
+      if (!slides[n]) return 0;
+      return slides[n].offsetLeft - slides[0].offsetLeft;
+    };
+
+    const wrapIfNeeded = () => {
+      const setW = getSetWidth();
+      if (!setW) return;
+
+      // Middle set should be around [setW .. 2*setW]
+      const leftThreshold = setW * 0.35;
+      const rightThreshold = setW * 1.65;
+
+      if (rail.scrollLeft < leftThreshold) {
+        rail.scrollLeft += setW;
+      } else if (rail.scrollLeft > rightThreshold) {
+        rail.scrollLeft -= setW;
       }
     };
 
-    let raf = 0;
-    let endTimer = null;
+    // Start at first slide of middle set (=> 1/4)
+    const startIndex = n;
 
-    const onScroll = () => {
-      if (jumping) return;
-
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        index = closestIndex();
-        setUI();
-        recenterIfNeeded();
-
-        if (endTimer) clearTimeout(endTimer);
-        endTimer = setTimeout(() => {
-          if (jumping) return;
-          index = closestIndex();
-          recenterIfNeeded();
-        }, 120);
-      });
-    };
-
-    rail.addEventListener("scroll", onScroll, { passive: true });
-    setUI();
-
-    document.querySelectorAll(`.arrowBtn[data-slider="${name}"]`).forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const dir = Number(btn.dataset.dir || 1);
-        index += dir;
-        scrollToIndex(index, true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        slides = Array.from(rail.children);
+        scrollToIndex(startIndex, false);
+        const idx = getClosestToCenter();
+        setUI(idx);
       });
     });
 
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        wrapIfNeeded();
+        const idx = getClosestToCenter();
+        setUI(idx);
+      });
+    };
+    rail.addEventListener("scroll", onScroll, { passive: true });
+
+    // arrows
+    document.querySelectorAll(`.arrowBtn[data-slider="${name}"]`).forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const dir = Number(btn.dataset.dir || 1);
+        const cur = getClosestToCenter();
+        scrollToIndex(cur + dir, true);
+      });
+    });
+
+    // keyboard
     document.addEventListener("keydown", (e) => {
       if (isTyping(document.activeElement)) return;
       const page = document.body.getAttribute("data-page");
@@ -219,12 +212,12 @@
       if (!ok) return;
 
       if (e.key === "ArrowRight") {
-        index += 1;
-        scrollToIndex(index, true);
+        const cur = getClosestToCenter();
+        scrollToIndex(cur + 1, true);
       }
       if (e.key === "ArrowLeft") {
-        index -= 1;
-        scrollToIndex(index, true);
+        const cur = getClosestToCenter();
+        scrollToIndex(cur - 1, true);
       }
     });
   }
