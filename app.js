@@ -83,10 +83,8 @@
   // Cursor dot (desktop)
   const dot = document.querySelector(".cursor-dot");
   if (dot && !isCoarse) {
-    let x = window.innerWidth / 2,
-      y = window.innerHeight / 2;
-    let tx = x,
-      ty = y;
+    let x = window.innerWidth / 2, y = window.innerHeight / 2;
+    let tx = x, ty = y;
 
     window.addEventListener("mousemove", (ev) => {
       tx = ev.clientX;
@@ -103,70 +101,122 @@
     requestAnimationFrame(tick);
   }
 
-  // Tilt (title)
-  const tilt = document.querySelector("[data-tilt]");
-  if (tilt && !isCoarse) {
-    const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-    const onMove = (ev) => {
-      const r = tilt.getBoundingClientRect();
-      const px = (ev.clientX - r.left) / r.width;
-      const py = (ev.clientY - r.top) / r.height;
-      const rx = clamp((0.5 - py) * 10, -8, 8);
-      const ry = clamp((px - 0.5) * 12, -10, 10);
-      tilt.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg)`;
-    };
-    const reset = () =>
-      (tilt.style.transform = "perspective(900px) rotateX(0deg) rotateY(0deg)");
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseleave", reset);
-  }
-
-  // Sliders: arrows + counter + focus + ← → + infinite wrap
-  function setupSlider(name) {
+  // True infinite slider (clones + seamless jump)
+  function setupInfiniteSlider(name) {
     const rail = document.getElementById(`rail-${name}`);
     if (!rail) return;
 
-    const slides = Array.from(rail.querySelectorAll(".slide"));
+    // only once
+    if (rail.dataset.infiniteReady === "1") return;
+    rail.dataset.infiniteReady = "1";
+
     const nowEl = document.getElementById(`${name}Now`);
     const totalEl = document.getElementById(`${name}Total`);
-    if (totalEl) totalEl.textContent = String(slides.length).padStart(2, "0");
 
-    const scrollToIndex = (idx) => {
-      const n = slides.length;
-      const wrapped = ((idx % n) + n) % n; // infinite wrap
-      slides[wrapped].scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+    const getSlides = () => Array.from(rail.querySelectorAll(".slide"));
+    let slides = getSlides();
+
+    // Save originals
+    const originals = slides.filter((s) => !s.classList.contains("is-clone"));
+    const total = originals.length;
+    if (totalEl) totalEl.textContent = String(total).padStart(2, "0");
+
+    if (total < 2) return;
+
+    // Create clones: last -> head, first -> tail
+    const first = originals[0];
+    const last = originals[originals.length - 1];
+
+    const firstClone = first.cloneNode(true);
+    firstClone.classList.add("is-clone");
+    firstClone.querySelectorAll("iframe").forEach((f) => {
+      // keep same src (ok), but avoid duplicate titles not important
+    });
+
+    const lastClone = last.cloneNode(true);
+    lastClone.classList.add("is-clone");
+
+    rail.insertBefore(lastClone, rail.firstChild);
+    rail.appendChild(firstClone);
+
+    slides = getSlides();
+    const realStartIndex = 1; // because we prepended 1 clone
+
+    // jump to first real without animation
+    const jumpTo = (index) => {
+      const target = slides[index];
+      if (!target) return;
+      rail.scrollLeft = target.offsetLeft - rail.offsetLeft;
     };
 
-    const update = () => {
-      const railRect = rail.getBoundingClientRect();
-      let best = 0,
-        bestDist = Infinity;
+    const smoothTo = (index) => {
+      const target = slides[index];
+      if (!target) return;
+      rail.scrollTo({ left: target.offsetLeft - rail.offsetLeft, behavior: "smooth" });
+    };
 
+    // initial position
+    requestAnimationFrame(() => jumpTo(realStartIndex));
+
+    const indexFromScroll = () => {
+      const railLeft = rail.getBoundingClientRect().left;
+      let best = 0, bestDist = Infinity;
       slides.forEach((s, i) => {
-        const r = s.getBoundingClientRect();
-        const dist = Math.abs(r.left - railRect.left);
-        if (dist < bestDist) {
-          bestDist = dist;
-          best = i;
-        }
+        const dist = Math.abs(s.getBoundingClientRect().left - railLeft);
+        if (dist < bestDist) { bestDist = dist; best = i; }
       });
-
-      if (nowEl) nowEl.textContent = String(best + 1).padStart(2, "0");
-      rail.classList.add("is-focusing");
-      slides.forEach((s, i) => s.classList.toggle("is-current", i === best));
+      return best;
     };
 
-    rail.addEventListener("scroll", () => requestAnimationFrame(update));
-    update();
+    const setCurrentUI = (realIdx) => {
+      const show = ((realIdx % total) + total) % total;
+      if (nowEl) nowEl.textContent = String(show + 1).padStart(2, "0");
 
+      rail.classList.add("is-focusing");
+      // focus only REAL slides visually
+      slides.forEach((s) => s.classList.remove("is-current"));
+      const currentRealSlide = originals[show];
+      currentRealSlide?.classList.add("is-current");
+    };
+
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const idx = indexFromScroll();
+
+        // if we’re on clones, jump
+        if (idx === 0) {
+          // at head clone (last)
+          jumpTo(total); // last real is at index total (because 0 clone + 1..total reals + tail clone)
+          setCurrentUI(total - 1);
+          return;
+        }
+        if (idx === total + 1) {
+          // at tail clone (first)
+          jumpTo(1);
+          setCurrentUI(0);
+          return;
+        }
+
+        // real slide indices: 1..total
+        setCurrentUI(idx - 1);
+      });
+    };
+
+    rail.addEventListener("scroll", onScroll);
+    onScroll();
+
+    // arrows
     document.querySelectorAll(`.arrowBtn[data-slider="${name}"]`).forEach((btn) => {
       btn.addEventListener("click", () => {
         const dir = Number(btn.getAttribute("data-dir") || "1");
-        const cur = Number((nowEl?.textContent || "01")) - 1;
-        scrollToIndex(cur + dir);
+        const idx = indexFromScroll();
+        smoothTo(idx + dir);
       });
     });
 
+    // keyboard ← →
     document.addEventListener("keydown", (e) => {
       if (isTyping(document.activeElement)) return;
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -175,12 +225,12 @@
       const ok = (name === "real" && page === "real") || (name === "reels" && page === "reels");
       if (!ok) return;
 
-      const cur = Number((nowEl?.textContent || "01")) - 1;
-      if (e.key === "ArrowRight") scrollToIndex(cur + 1);
-      if (e.key === "ArrowLeft") scrollToIndex(cur - 1);
+      const idx = indexFromScroll();
+      if (e.key === "ArrowRight") smoothTo(idx + 1);
+      if (e.key === "ArrowLeft") smoothTo(idx - 1);
     });
   }
 
-  setupSlider("real");
-  setupSlider("reels");
+  setupInfiniteSlider("real");
+  setupInfiniteSlider("reels");
 })();
