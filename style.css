@@ -455,3 +455,9 @@ a{color:inherit;text-decoration:none}
 @media (pointer: coarse){
   .glass--hint{display:none !important;}
 }
+
+/* IMPORTANT: used by JS to recenter invisibly */
+.rail.is-jumping{
+  scroll-snap-type: none !important;
+  scroll-behavior: auto !important;
+}
