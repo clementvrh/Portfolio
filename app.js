@@ -62,7 +62,6 @@
     const href = a.getAttribute("href");
     if (!href) return;
 
-    // Ignore mailto, tel, external
     if (href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("http")) return;
 
     if (href.startsWith("./") || href.endsWith(".html")) {
@@ -101,12 +100,11 @@
     requestAnimationFrame(tick);
   }
 
-  // True infinite slider (clones + seamless jump)
+  // Seamed infinite slider: clones + invisible jump (no visible snap back)
   function setupInfiniteSlider(name) {
     const rail = document.getElementById(`rail-${name}`);
     if (!rail) return;
 
-    // only once
     if (rail.dataset.infiniteReady === "1") return;
     rail.dataset.infiniteReady = "1";
 
@@ -116,23 +114,17 @@
     const getSlides = () => Array.from(rail.querySelectorAll(".slide"));
     let slides = getSlides();
 
-    // Save originals
     const originals = slides.filter((s) => !s.classList.contains("is-clone"));
     const total = originals.length;
     if (totalEl) totalEl.textContent = String(total).padStart(2, "0");
-
     if (total < 2) return;
 
-    // Create clones: last -> head, first -> tail
+    // clone last -> head, first -> tail
     const first = originals[0];
     const last = originals[originals.length - 1];
 
     const firstClone = first.cloneNode(true);
     firstClone.classList.add("is-clone");
-    firstClone.querySelectorAll("iframe").forEach((f) => {
-      // keep same src (ok), but avoid duplicate titles not important
-    });
-
     const lastClone = last.cloneNode(true);
     lastClone.classList.add("is-clone");
 
@@ -140,27 +132,36 @@
     rail.appendChild(firstClone);
 
     slides = getSlides();
-    const realStartIndex = 1; // because we prepended 1 clone
 
-    // jump to first real without animation
-    const jumpTo = (index) => {
+    const disableSnap = () => rail.classList.add("is-jumping");
+    const enableSnap = () => rail.classList.remove("is-jumping");
+
+    const jumpToIndex = (index) => {
       const target = slides[index];
       if (!target) return;
+
+      disableSnap();
       rail.scrollLeft = target.offsetLeft - rail.offsetLeft;
+
+      // re-enable snap next frame (invisible)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => enableSnap());
+      });
     };
 
-    const smoothTo = (index) => {
+    const smoothToIndex = (index) => {
       const target = slides[index];
       if (!target) return;
       rail.scrollTo({ left: target.offsetLeft - rail.offsetLeft, behavior: "smooth" });
     };
 
-    // initial position
-    requestAnimationFrame(() => jumpTo(realStartIndex));
+    // Start on first real slide (index 1)
+    requestAnimationFrame(() => jumpToIndex(1));
 
     const indexFromScroll = () => {
       const railLeft = rail.getBoundingClientRect().left;
       let best = 0, bestDist = Infinity;
+
       slides.forEach((s, i) => {
         const dist = Math.abs(s.getBoundingClientRect().left - railLeft);
         if (dist < bestDist) { bestDist = dist; best = i; }
@@ -173,10 +174,8 @@
       if (nowEl) nowEl.textContent = String(show + 1).padStart(2, "0");
 
       rail.classList.add("is-focusing");
-      // focus only REAL slides visually
-      slides.forEach((s) => s.classList.remove("is-current"));
-      const currentRealSlide = originals[show];
-      currentRealSlide?.classList.add("is-current");
+      originals.forEach((s) => s.classList.remove("is-current"));
+      originals[show]?.classList.add("is-current");
     };
 
     let raf = 0;
@@ -185,26 +184,26 @@
       raf = requestAnimationFrame(() => {
         const idx = indexFromScroll();
 
-        // if we’re on clones, jump
+        // idx = 0 -> head clone (last)
         if (idx === 0) {
-          // at head clone (last)
-          jumpTo(total); // last real is at index total (because 0 clone + 1..total reals + tail clone)
+          jumpToIndex(total); // last real slide index
           setCurrentUI(total - 1);
           return;
         }
+
+        // idx = total+1 -> tail clone (first)
         if (idx === total + 1) {
-          // at tail clone (first)
-          jumpTo(1);
+          jumpToIndex(1); // first real slide
           setCurrentUI(0);
           return;
         }
 
-        // real slide indices: 1..total
+        // real slides are 1..total
         setCurrentUI(idx - 1);
       });
     };
 
-    rail.addEventListener("scroll", onScroll);
+    rail.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
 
     // arrows
@@ -212,7 +211,7 @@
       btn.addEventListener("click", () => {
         const dir = Number(btn.getAttribute("data-dir") || "1");
         const idx = indexFromScroll();
-        smoothTo(idx + dir);
+        smoothToIndex(idx + dir);
       });
     });
 
@@ -226,8 +225,8 @@
       if (!ok) return;
 
       const idx = indexFromScroll();
-      if (e.key === "ArrowRight") smoothTo(idx + 1);
-      if (e.key === "ArrowLeft") smoothTo(idx - 1);
+      if (e.key === "ArrowRight") smoothToIndex(idx + 1);
+      if (e.key === "ArrowLeft") smoothToIndex(idx - 1);
     });
   }
 
