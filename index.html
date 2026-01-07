@@ -15,7 +15,8 @@
   <header class="header">
     <div class="hotkeys">
       <div class="hotkeys__inner">
-        <div class="hotkeys__group">
+        <!-- LEFT: hotkeys -->
+        <div class="hotkeys__group hotkeys__group--nav">
           <a class="hotkey hotkey--link" href="./real-estate.html" data-key="r" data-tip="Real Estate">
             <span class="keycap">R</span><span class="hotkey__txt">Real Estate</span>
           </a>
@@ -27,11 +28,13 @@
           </a>
         </div>
 
+        <!-- CENTER: logo -->
         <a class="brand" href="./index.html" aria-label="Retour accueil">
           <img class="brand__logo" src="./vrh-logo.png" alt="VRH PROD" />
         </a>
 
-        <div class="hotkeys__group hotkeys__group--right">
+        <!-- RIGHT: home + esc + contact -->
+        <div class="hotkeys__group hotkeys__group--right hotkeys__group--nav">
           <a class="hotkey hotkey--link" href="./index.html" data-key="h" data-tip="Accueil">
             <span class="keycap">H</span><span class="hotkey__txt">Home</span>
           </a>
@@ -48,10 +51,13 @@
 
   <main class="wrap wrap--home">
     <section class="hero hero--home">
-      <div class="titleBlock tilt" data-tilt>
-        <h1 class="title title--wow">VRH PROD</h1>
-        <div class="titleSheen" aria-hidden="true"></div>
-      </div>
+      <!-- Title: glow wave letter-by-letter -->
+      <h1 class="title title--glowwave" aria-label="VRH PROD">
+        <span class="glowtext" aria-hidden="true">
+          <span>V</span><span>R</span><span>H</span><span>&nbsp;</span><span>P</span><span>R</span><span>O</span><span>D</span>
+        </span>
+        <span class="sr-only">VRH PROD</span>
+      </h1>
 
       <div class="glass glass--hint">
         <div class="hintLine">
