@@ -1,30 +1,23 @@
 (function () {
   const isCoarse = window.matchMedia("(pointer: coarse)").matches;
 
-  /* ============ basics (nav + cursor) ============ */
-
   const transition = document.querySelector(".page-transition");
-  const hotkeyEl = (k) => document.querySelector(`.hotkey[data-key="${k}"]`);
-
-  const pressKey = (k) => {
-    const el = hotkeyEl(k);
-    if (!el) return;
-    el.classList.add("is-pressed");
-    setTimeout(() => el.classList.remove("is-pressed"), 120);
-  };
 
   const setActiveKey = () => {
     const page = document.body.getAttribute("data-page");
     document.querySelectorAll(".hotkey").forEach((e) => e.classList.remove("is-active"));
-
+    const hotkeyEl = (k) => document.querySelector(`.hotkey[data-key="${k}"]`);
     if (page === "home") hotkeyEl("h")?.classList.add("is-active");
     if (page === "real") hotkeyEl("r")?.classList.add("is-active");
     if (page === "reels") hotkeyEl("i")?.classList.add("is-active");
     if (page === "inde") hotkeyEl("p")?.classList.add("is-active");
   };
+  setActiveKey();
 
-  const navigate = (url, kForPress) => {
-    if (kForPress) pressKey(kForPress);
+  const isTyping = (el) =>
+    el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+
+  const navigate = (url) => {
     if (transition) {
       transition.classList.add("is-on");
       setTimeout(() => (window.location.href = url), 180);
@@ -33,31 +26,12 @@
     }
   };
 
-  setActiveKey();
-
-  const isTyping = (el) =>
-    el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
-
-  document.addEventListener("keydown", (e) => {
-    if (isTyping(document.activeElement)) return;
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-
-    const k = e.key.toLowerCase();
-    if (k === "r") navigate("./real-estate.html", "r");
-    if (k === "i") navigate("./reels-interviews.html", "i");
-    if (k === "p") navigate("./projets-independants.html", "p");
-    if (k === "h") navigate("./index.html", "h");
-
-    if (e.key === "Escape") pressKey("escape");
-  });
-
   document.addEventListener("click", (e) => {
     const a = e.target.closest("a");
     if (!a) return;
     const href = a.getAttribute("href");
     if (!href) return;
     if (href.startsWith("mailto:") || href.startsWith("http")) return;
-
     if (href.endsWith(".html")) {
       e.preventDefault();
       navigate(href);
@@ -94,17 +68,10 @@
     requestAnimationFrame(tick);
   }
 
-  /* ============ FIX: title duplicated (hide raw fallback if exists) ============ */
-  // If both ".title" and ".glowtext" exist inside same block, we keep the glowtext and hide the plain one.
-  // (CSS also reinforces, but we do a safe fix here too.)
-  document.querySelectorAll(".titleBlock, .hero, body").forEach((scope) => {
-    const plain = scope.querySelector?.("h1.title:not(.glowtextTitle)");
-    const glow = scope.querySelector?.(".glowtext");
-    if (plain && glow) plain.style.display = "none";
-  });
-
-  /* ============ Infinite carousel (3 sets) — TRUE infinite both sides, order preserved ============ */
-
+  /* ===== Infinite Carousel (3 full sets) =====
+     This is smooth on mobile AND desktop because we never "teleport" from 1->4.
+     We just recenter invisibly when we drift too far.
+  */
   function setupCarousel(name) {
     const rail = document.getElementById(`rail-${name}`);
     if (!rail) return;
@@ -120,31 +87,26 @@
 
     if (totalEl) totalEl.textContent = String(n).padStart(2, "0");
 
-    // Build A + B + C, where B is the original set
-    // IMPORTANT: Keep original DOM nodes (B) as-is to preserve exact order.
     const fragA = document.createDocumentFragment();
     const fragC = document.createDocumentFragment();
 
-    // A: clone of originals (same order)
     originals.forEach((node) => {
       const c = node.cloneNode(true);
       c.classList.add("is-dup");
       fragA.appendChild(c);
     });
 
-    // C: clone of originals (same order)
     originals.forEach((node) => {
       const c = node.cloneNode(true);
       c.classList.add("is-dup");
       fragC.appendChild(c);
     });
 
-    // prepend A then append C
     rail.insertBefore(fragA, rail.firstChild);
     rail.appendChild(fragC);
 
     const slides = Array.from(rail.children); // 3n
-    const startIndex = n; // first element of middle set (B) => video 1/4
+    const startIndex = n; // first slide of middle set => 1/4
 
     let index = startIndex;
     let jumping = false;
@@ -152,11 +114,9 @@
     const disableSnap = () => rail.classList.add("is-jumping");
     const enableSnap = () => rail.classList.remove("is-jumping");
 
-    const leftForIndex = (i) => (slides[i].offsetLeft - rail.offsetLeft);
+    const leftForIndex = (i) => slides[i].offsetLeft - rail.offsetLeft;
 
     const scrollToIndex = (i, smooth = true) => {
-      const t = slides[i];
-      if (!t) return;
       rail.scrollTo({ left: leftForIndex(i), behavior: smooth ? "smooth" : "auto" });
     };
 
@@ -173,27 +133,24 @@
       });
     };
 
-    // map any index -> real slide [0..n-1] preserving order
     const realFromIndex = (i) => {
       const r = i % n;
       return r < 0 ? r + n : r;
     };
 
     const setUI = () => {
-      const real = realFromIndex(index);
-      if (nowEl) nowEl.textContent = String(real + 1).padStart(2, "0");
-
       rail.classList.add("is-focusing");
       slides.forEach((s) => s.classList.remove("is-current"));
       slides[index]?.classList.add("is-current");
+
+      const real = realFromIndex(index);
+      if (nowEl) nowEl.textContent = String(real + 1).padStart(2, "0");
     };
 
     const closestIndex = () => {
       const cur = rail.scrollLeft;
       let best = 0;
       let bestDist = Infinity;
-
-      // find nearest slide to current scrollLeft
       for (let i = 0; i < slides.length; i++) {
         const d = Math.abs(leftForIndex(i) - cur);
         if (d < bestDist) {
@@ -204,7 +161,7 @@
       return best;
     };
 
-    // Start exactly at video 1/4 (center)
+    // Start at 1/4
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         index = startIndex;
@@ -212,14 +169,12 @@
       });
     });
 
-    // HARD requirement: infinite in both directions, including long continuous scroll on desktop.
-    // Strategy: while scrolling, if we approach edges (A or C), recenter immediately (invisible).
+    // Recenter early enough so desktop never hits the end.
     const recenterIfNeeded = () => {
-      // middle set is [n .. 2n-1]
-      if (index < n * 0.6) {
-        index += n; // bring to middle
+      if (index < n * 0.7) {
+        index += n;
         hardJump(index);
-      } else if (index > n * 2.4) {
+      } else if (index > n * 2.3) {
         index -= n;
         hardJump(index);
       }
@@ -235,11 +190,8 @@
       raf = requestAnimationFrame(() => {
         index = closestIndex();
         setUI();
-
-        // recenter DURING scrolling too (fix desktop "finite to the right")
         recenterIfNeeded();
 
-        // also recenter after momentum ends (for mobile)
         if (endTimer) clearTimeout(endTimer);
         endTimer = setTimeout(() => {
           if (jumping) return;
@@ -252,7 +204,6 @@
     rail.addEventListener("scroll", onScroll, { passive: true });
     setUI();
 
-    // arrows
     document.querySelectorAll(`.arrowBtn[data-slider="${name}"]`).forEach((btn) => {
       btn.addEventListener("click", () => {
         const dir = Number(btn.dataset.dir || 1);
@@ -261,7 +212,6 @@
       });
     });
 
-    // keyboard
     document.addEventListener("keydown", (e) => {
       if (isTyping(document.activeElement)) return;
       const page = document.body.getAttribute("data-page");
