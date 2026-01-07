@@ -32,10 +32,10 @@
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
     const k = e.key.toLowerCase();
-    if (k === "r") return navigate("./real-estate.html?v=final");
-    if (k === "i") return navigate("./reels-interviews.html?v=final");
-    if (k === "p") return navigate("./projets-independants.html?v=final");
-    if (k === "h") return navigate("./index.html?v=final");
+    if (k === "r") return navigate("./real-estate.html?v=10");
+    if (k === "i") return navigate("./reels-interviews.html?v=10");
+    if (k === "p") return navigate("./projets-independants.html?v=10");
+    if (k === "h") return navigate("./index.html?v=10");
   });
 
   /* ======================
@@ -77,146 +77,205 @@
   }
 
   /* ======================
-     INFINITE CAROUSEL (UNLIMITED)
-     - Works with any number of slides (n)
-     - Starts at 1/n (first slide)
-     - Infinite left/right
-     - Smooth snap
-     - Center slide highlighted
+     INFINITE CAROUSEL (TRANSFORM-BASED)
+     - Works on iOS/Android/Desktop
+     - True infinite left/right
+     - Starts on 1/n (first slide)
+     - Any number of slides
   ====================== */
 
-  function setupCarousel(name) {
+  function setupTransformCarousel(name) {
     const rail = document.getElementById(`rail-${name}`);
     if (!rail) return;
-    if (rail.dataset.inited === "1") return;
-    rail.dataset.inited = "1";
+    if (rail.dataset.tc === "1") return;
+    rail.dataset.tc = "1";
 
     const nowEl = document.getElementById(`${name}Now`);
     const totalEl = document.getElementById(`${name}Total`);
 
+    // original slides = direct children (article.slide)
     const originals = Array.from(rail.children);
     const n = originals.length;
     if (!n) return;
 
     if (totalEl) totalEl.textContent = String(n).padStart(2, "0");
 
-    // Build A + B + C
+    // Build track
+    const track = document.createElement("div");
+    track.className = "rail__track";
+
+    // Move originals into track (middle set B)
+    originals.forEach((el) => track.appendChild(el));
+
+    // Clone A and C from the originals we just moved
+    const setB = Array.from(track.children); // n slides
+
     const fragA = document.createDocumentFragment();
+    setB.forEach((el) => {
+      const c = el.cloneNode(true);
+      c.classList.add("is-dup");
+      fragA.appendChild(c);
+    });
+
     const fragC = document.createDocumentFragment();
-    originals.forEach((node) => fragA.appendChild(node.cloneNode(true)));
-    originals.forEach((node) => fragC.appendChild(node.cloneNode(true)));
-    rail.prepend(fragA);
-    rail.appendChild(fragC);
+    setB.forEach((el) => {
+      const c = el.cloneNode(true);
+      c.classList.add("is-dup");
+      fragC.appendChild(c);
+    });
 
-    const slides = Array.from(rail.children); // 3n
+    // Rebuild track = A + B + C
+    track.innerHTML = "";
+    track.appendChild(fragA);
+    setB.forEach((el) => track.appendChild(el));
+    track.appendChild(fragC);
 
-    let currentReal = 0;
-    let isJumping = false;
+    // Replace rail content
+    rail.innerHTML = "";
+    rail.appendChild(track);
+
+    const slides = Array.from(track.children); // 3n
+
+    // Measurements
+    let gap = 22;
+    let cardW = 360;
+    let step = 382; // cardW + gap
     let setW = 0;
-    let step = 0; // one slide step in px (measured, robust)
 
-    const clampReal = (r) => ((r % n) + n) % n;
+    const viewportW = () => rail.getBoundingClientRect().width;
+    const centerOffset = () => (viewportW() - cardW) / 2;
 
-    const computeMetrics = () => {
-      setW = rail.scrollWidth / 3;
-      // step = distance between consecutive slides in the middle set
-      const a = slides[n + 0];
-      const b = slides[n + 1] || slides[n + 0];
-      step = Math.abs((b?.offsetLeft ?? 0) - (a?.offsetLeft ?? 0)) || 1;
-    };
+    function measure() {
+      const cs = getComputedStyle(track);
+      const g = parseFloat(cs.columnGap || cs.gap || "22");
+      gap = Number.isFinite(g) ? g : 22;
 
-    const disableSnap = () => rail.classList.add("is-jumping");
-    const enableSnap = () => rail.classList.remove("is-jumping");
+      const el = slides[n]; // first of middle set
+      cardW = el ? el.getBoundingClientRect().width : 360;
+      step = cardW + gap;
+      setW = step * n;
+    }
 
-    const hardSetScrollLeft = (left) => {
-      isJumping = true;
-      disableSnap();
-      rail.scrollLeft = left;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          enableSnap();
-          isJumping = false;
-        });
-      });
-    };
+    // State
+    let x = 0;
+    let targetX = 0;
+    let vel = 0;
+    let dragging = false;
+    let startPX = 0;
+    let startTarget = 0;
 
-    const centeredLeftFor = (el) => {
-      const left = el.offsetLeft - rail.offsetLeft;
-      return left - (rail.clientWidth - el.clientWidth) / 2;
-    };
+    let realIndex = 0;
 
-    // Keep scrollLeft in middle band using exact offsets (no visible jump)
-    const keepInMiddleSet = () => {
-      if (!setW) return;
+    function clampReal(r) {
+      r = r % n;
+      if (r < 0) r += n;
+      return r;
+    }
 
-      // Use wider safe band to avoid fighting inertia on trackpad
-      const min = setW * 0.35;
-      const max = setW * 1.65;
+    function posForRealIndex(r) {
+      // slide in middle set = (n + r) * step
+      const slideLeft = (n + r) * step;
+      return -(slideLeft - centerOffset());
+    }
 
-      if (rail.scrollLeft < min) hardSetScrollLeft(rail.scrollLeft + setW);
-      else if (rail.scrollLeft > max) hardSetScrollLeft(rail.scrollLeft - setW);
-    };
-
-    const setActive = (real) => {
-      currentReal = clampReal(real);
+    function setActive(r) {
+      realIndex = clampReal(r);
       rail.classList.add("is-focusing");
       slides.forEach((s) => s.classList.remove("is-current"));
+      slides[n + realIndex]?.classList.add("is-current");
+      if (nowEl) nowEl.textContent = String(realIndex + 1).padStart(2, "0");
+    }
 
-      // highlight middle set only
-      slides[n + currentReal]?.classList.add("is-current");
+    function recenterIfNeeded() {
+      const p = -x; // track position
+      const min = step * (n * 0.35);
+      const max = step * (n * 1.65);
 
-      if (nowEl) nowEl.textContent = String(currentReal + 1).padStart(2, "0");
-    };
+      if (p < min) {
+        x -= setW;
+        targetX -= setW;
+      } else if (p > max) {
+        x += setW;
+        targetX += setW;
+      }
+    }
 
-    const scrollToReal = (real, smooth = true) => {
-      const r = clampReal(real);
-      const el = slides[n + r];
-      if (!el) return;
+    function render() {
+      const diff = targetX - x;
+      vel = vel * 0.82 + diff * 0.18;
+      x += vel;
 
-      const target = centeredLeftFor(el);
-      if (smooth) rail.scrollTo({ left: target, behavior: "smooth" });
-      else hardSetScrollLeft(target);
+      recenterIfNeeded();
 
+      track.style.transform = `translate3d(${x}px,0,0)`;
+      requestAnimationFrame(render);
+    }
+
+    function goTo(r, smooth = true) {
+      r = clampReal(r);
       setActive(r);
-    };
+      const px = posForRealIndex(r);
+      if (!smooth) {
+        x = px;
+        targetX = px;
+        vel = 0;
+      } else {
+        targetX = px;
+      }
+    }
 
-    // ✅ Key change: determine current index by scrollLeft proximity,
-    // not by getBoundingClientRect (which can be noisy with masks/padding).
-    const closestRealByScroll = () => {
-      const base = centeredLeftFor(slides[n + 0]); // "ideal left" for 1/4
-      const cur = rail.scrollLeft;
+    function snapToNearest() {
+      const p = -targetX;
+      const approx = (p - centerOffset()) / step - n;
+      const r = clampReal(Math.round(approx));
+      goTo(r, true);
+    }
 
-      // How many steps from the first middle slide?
-      const k = Math.round((cur - base) / step);
-      return clampReal(k);
-    };
+    // Pointer drag (touch + mouse)
+    rail.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      rail.setPointerCapture(e.pointerId);
+      startPX = e.clientX;
+      startTarget = targetX;
+      vel = 0;
+      rail.classList.add("is-dragging");
+    });
 
-    // Smooth end-of-scroll snap
-    let endTimer = null;
-    const onScroll = () => {
-      if (isJumping) return;
+    rail.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startPX;
+      targetX = startTarget + dx;
+    });
 
-      keepInMiddleSet();
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      rail.classList.remove("is-dragging");
+      snapToNearest();
+    }
 
-      const curReal = closestRealByScroll();
-      setActive(curReal);
+    rail.addEventListener("pointerup", endDrag);
+    rail.addEventListener("pointercancel", endDrag);
+    rail.addEventListener("lostpointercapture", endDrag);
 
-      if (endTimer) clearTimeout(endTimer);
-      endTimer = setTimeout(() => {
-        if (isJumping) return;
-        keepInMiddleSet();
-        const snapReal = closestRealByScroll();
-        scrollToReal(snapReal, true);
-      }, 140);
-    };
-
-    rail.addEventListener("scroll", onScroll, { passive: true });
+    // Wheel support on desktop
+    rail.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+        targetX -= delta;
+        if (rail._snapT) clearTimeout(rail._snapT);
+        rail._snapT = setTimeout(() => snapToNearest(), 140);
+      },
+      { passive: false }
+    );
 
     // Buttons
     document.querySelectorAll(`.arrowBtn[data-slider="${name}"]`).forEach((btn) => {
       btn.addEventListener("click", () => {
         const dir = Number(btn.dataset.dir || 1);
-        scrollToReal(currentReal + dir, true);
+        goTo(realIndex + dir, true);
       });
     });
 
@@ -226,37 +285,26 @@
       const ok = (name === "real" && page === "real") || (name === "reels" && page === "reels");
       if (!ok) return;
 
-      if (e.key === "ArrowRight") scrollToReal(currentReal + 1, true);
-      if (e.key === "ArrowLeft") scrollToReal(currentReal - 1, true);
+      if (e.key === "ArrowRight") goTo(realIndex + 1, true);
+      if (e.key === "ArrowLeft") goTo(realIndex - 1, true);
     });
 
+    // Init (after layout settles)
     const init = () => {
-      computeMetrics();
-
-      // Start at 1/4
-      setActive(0);
-      scrollToReal(0, false);
-
-      // Recompute after iframes load (they can change widths)
-      setTimeout(() => {
-        computeMetrics();
-        scrollToReal(0, false);
-      }, 450);
-
-      setTimeout(() => {
-        computeMetrics();
-        scrollToReal(currentReal, false);
-      }, 1100);
+      measure();
+      goTo(0, false); // start at 1/n
     };
 
     init();
     window.addEventListener("load", init);
     window.addEventListener("resize", () => {
-      computeMetrics();
-      scrollToReal(currentReal, false);
+      measure();
+      goTo(realIndex, false);
     });
+
+    requestAnimationFrame(render);
   }
 
-  setupCarousel("real");
-  setupCarousel("reels");
+  setupTransformCarousel("real");
+  setupTransformCarousel("reels");
 })();

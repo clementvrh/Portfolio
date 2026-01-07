@@ -5,7 +5,7 @@ Portfolio statique (HTML/CSS/JS) hébergé sur **GitHub Pages**.
 ## Navigation
 - Desktop : R / I / P / H (navigation pages)
 - Pages vidéos : flèches ← → + boutons
-- Mobile : swipe sur les sliders
+- Mobile : swipe (drag) sur les sliders
 
 ## Pages
 - `index.html` : accueil
