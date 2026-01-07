@@ -77,11 +77,12 @@
   }
 
   /* ======================
-     INFINITE CAROUSEL (PRO)
-     - Start 1/4
+     INFINITE CAROUSEL (UNLIMITED)
+     - Works with any number of slides (n)
+     - Starts at 1/n (first slide)
      - Infinite left/right
-     - No jump visible
-     - Same behavior desktop/mobile
+     - Smooth snap
+     - Center slide highlighted
   ====================== */
 
   function setupCarousel(name) {
@@ -93,7 +94,6 @@
     const nowEl = document.getElementById(`${name}Now`);
     const totalEl = document.getElementById(`${name}Total`);
 
-    // originals (your 4 slides in HTML, in correct order)
     const originals = Array.from(rail.children);
     const n = originals.length;
     if (!n) return;
@@ -103,31 +103,26 @@
     // Build A + B + C
     const fragA = document.createDocumentFragment();
     const fragC = document.createDocumentFragment();
-
     originals.forEach((node) => fragA.appendChild(node.cloneNode(true)));
     originals.forEach((node) => fragC.appendChild(node.cloneNode(true)));
-
     rail.prepend(fragA);
     rail.appendChild(fragC);
 
     const slides = Array.from(rail.children); // 3n
 
-    let currentReal = 0; // 0..n-1
+    let currentReal = 0;
     let isJumping = false;
     let setW = 0;
+    let step = 0; // one slide step in px (measured, robust)
 
     const clampReal = (r) => ((r % n) + n) % n;
 
-    const computeSetWidth = () => {
-      // total scrollWidth = 3 sets
+    const computeMetrics = () => {
       setW = rail.scrollWidth / 3;
-      if (!isFinite(setW) || setW <= 0) setW = 0;
-    };
-
-    const centeredLeftFor = (el) => {
-      // center slide in viewport
-      const left = el.offsetLeft - rail.offsetLeft;
-      return left - (rail.clientWidth - el.clientWidth) / 2;
+      // step = distance between consecutive slides in the middle set
+      const a = slides[n + 0];
+      const b = slides[n + 1] || slides[n + 0];
+      step = Math.abs((b?.offsetLeft ?? 0) - (a?.offsetLeft ?? 0)) || 1;
     };
 
     const disableSnap = () => rail.classList.add("is-jumping");
@@ -137,7 +132,6 @@
       isJumping = true;
       disableSnap();
       rail.scrollLeft = left;
-
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           enableSnap();
@@ -146,83 +140,74 @@
       });
     };
 
+    const centeredLeftFor = (el) => {
+      const left = el.offsetLeft - rail.offsetLeft;
+      return left - (rail.clientWidth - el.clientWidth) / 2;
+    };
+
+    // Keep scrollLeft in middle band using exact offsets (no visible jump)
     const keepInMiddleSet = () => {
-      // we keep scrollLeft within [0.5*setW .. 1.5*setW] by shifting +-setW
       if (!setW) return;
 
-      while (rail.scrollLeft < setW * 0.5) {
-        hardSetScrollLeft(rail.scrollLeft + setW);
-      }
-      while (rail.scrollLeft > setW * 1.5) {
-        hardSetScrollLeft(rail.scrollLeft - setW);
-      }
+      // Use wider safe band to avoid fighting inertia on trackpad
+      const min = setW * 0.35;
+      const max = setW * 1.65;
+
+      if (rail.scrollLeft < min) hardSetScrollLeft(rail.scrollLeft + setW);
+      else if (rail.scrollLeft > max) hardSetScrollLeft(rail.scrollLeft - setW);
     };
 
     const setActive = (real) => {
       currentReal = clampReal(real);
-
       rail.classList.add("is-focusing");
       slides.forEach((s) => s.classList.remove("is-current"));
 
-      // highlight ONLY the middle set element
-      const mid = n + currentReal;
-      slides[mid]?.classList.add("is-current");
+      // highlight middle set only
+      slides[n + currentReal]?.classList.add("is-current");
 
       if (nowEl) nowEl.textContent = String(currentReal + 1).padStart(2, "0");
     };
 
     const scrollToReal = (real, smooth = true) => {
       const r = clampReal(real);
-      const el = slides[n + r]; // middle set
+      const el = slides[n + r];
       if (!el) return;
 
       const target = centeredLeftFor(el);
-
       if (smooth) rail.scrollTo({ left: target, behavior: "smooth" });
       else hardSetScrollLeft(target);
 
       setActive(r);
     };
 
-    const closestRealToCenter = () => {
-      // measure center distance within middle set only
-      const railRect = rail.getBoundingClientRect();
-      const cx = railRect.left + railRect.width / 2;
+    // ✅ Key change: determine current index by scrollLeft proximity,
+    // not by getBoundingClientRect (which can be noisy with masks/padding).
+    const closestRealByScroll = () => {
+      const base = centeredLeftFor(slides[n + 0]); // "ideal left" for 1/4
+      const cur = rail.scrollLeft;
 
-      let best = 0;
-      let bestDist = Infinity;
-
-      for (let i = 0; i < n; i++) {
-        const el = slides[n + i];
-        if (!el) continue;
-        const r = el.getBoundingClientRect();
-        const elCx = r.left + r.width / 2;
-        const d = Math.abs(elCx - cx);
-        if (d < bestDist) {
-          bestDist = d;
-          best = i;
-        }
-      }
-      return best;
+      // How many steps from the first middle slide?
+      const k = Math.round((cur - base) / step);
+      return clampReal(k);
     };
 
-    // Smooth “end of scroll” snap (works for touch + trackpad)
+    // Smooth end-of-scroll snap
     let endTimer = null;
     const onScroll = () => {
       if (isJumping) return;
+
       keepInMiddleSet();
 
-      // update active while scrolling (for opacity focus)
-      const cur = closestRealToCenter();
-      setActive(cur);
+      const curReal = closestRealByScroll();
+      setActive(curReal);
 
       if (endTimer) clearTimeout(endTimer);
       endTimer = setTimeout(() => {
         if (isJumping) return;
         keepInMiddleSet();
-        const snapTo = closestRealToCenter();
-        scrollToReal(snapTo, true);
-      }, 110);
+        const snapReal = closestRealByScroll();
+        scrollToReal(snapReal, true);
+      }, 140);
     };
 
     rail.addEventListener("scroll", onScroll, { passive: true });
@@ -235,7 +220,7 @@
       });
     });
 
-    // Keyboard arrows on the right page only
+    // Keyboard arrows (only on the correct page)
     document.addEventListener("keydown", (e) => {
       const page = document.body.getAttribute("data-page");
       const ok = (name === "real" && page === "real") || (name === "reels" && page === "reels");
@@ -246,29 +231,28 @@
     });
 
     const init = () => {
-      computeSetWidth();
+      computeMetrics();
 
-      // Force starting point: first slide of middle set (1/4)
+      // Start at 1/4
       setActive(0);
       scrollToReal(0, false);
 
-      // after iframes load, widths can change a tiny bit => re-center
+      // Recompute after iframes load (they can change widths)
       setTimeout(() => {
-        computeSetWidth();
+        computeMetrics();
         scrollToReal(0, false);
       }, 450);
 
       setTimeout(() => {
-        computeSetWidth();
+        computeMetrics();
         scrollToReal(currentReal, false);
       }, 1100);
     };
 
-    // init now + after load
     init();
     window.addEventListener("load", init);
     window.addEventListener("resize", () => {
-      computeSetWidth();
+      computeMetrics();
       scrollToReal(currentReal, false);
     });
   }
