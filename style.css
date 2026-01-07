@@ -448,3 +448,16 @@ a{color:inherit;text-decoration:none}
 @media (pointer: coarse){
   .glass--hint{display:none !important;}
 }
+/* === FIX: title doublé (on garde le glowtext si présent) === */
+.titleBlock h1.title{ display:none; }
+.titleBlock .glowtext{ display:inline-flex; }
+
+/* === FIX: carousel opacity — center pops === */
+.rail.is-focusing .slide{ opacity:.38 !important; }
+.slide.is-current{ opacity:1 !important; }
+
+/* === FIX: fade bords plus doux (desktop + mobile) === */
+.rail{
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%) !important;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%) !important;
+}

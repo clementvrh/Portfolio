@@ -1,6 +1,8 @@
 (function () {
   const isCoarse = window.matchMedia("(pointer: coarse)").matches;
 
+  /* ============ basics (nav + cursor) ============ */
+
   const transition = document.querySelector(".page-transition");
   const hotkeyEl = (k) => document.querySelector(`.hotkey[data-key="${k}"]`);
 
@@ -70,7 +72,6 @@
     });
   }
 
-  /* cursor dot */
   const dot = document.querySelector(".cursor-dot");
   if (dot && !isCoarse) {
     let x = window.innerWidth / 2;
@@ -93,7 +94,16 @@
     requestAnimationFrame(tick);
   }
 
-  /* ===== Infinite carousel (true loop, smooth) ===== */
+  /* ============ FIX: title duplicated (hide raw fallback if exists) ============ */
+  // If both ".title" and ".glowtext" exist inside same block, we keep the glowtext and hide the plain one.
+  // (CSS also reinforces, but we do a safe fix here too.)
+  document.querySelectorAll(".titleBlock, .hero, body").forEach((scope) => {
+    const plain = scope.querySelector?.("h1.title:not(.glowtextTitle)");
+    const glow = scope.querySelector?.(".glowtext");
+    if (plain && glow) plain.style.display = "none";
+  });
+
+  /* ============ Infinite carousel (3 sets) — TRUE infinite both sides, order preserved ============ */
 
   function setupCarousel(name) {
     const rail = document.getElementById(`rail-${name}`);
@@ -110,29 +120,31 @@
 
     if (totalEl) totalEl.textContent = String(n).padStart(2, "0");
 
-    // Build: [clone set A] + [original set B] + [clone set C]
+    // Build A + B + C, where B is the original set
+    // IMPORTANT: Keep original DOM nodes (B) as-is to preserve exact order.
     const fragA = document.createDocumentFragment();
     const fragC = document.createDocumentFragment();
 
-    originals.forEach((node) => {
-      const c = node.cloneNode(true);
-      c.classList.add("is-dup");
-      fragC.appendChild(c);
-    });
-
+    // A: clone of originals (same order)
     originals.forEach((node) => {
       const c = node.cloneNode(true);
       c.classList.add("is-dup");
       fragA.appendChild(c);
     });
 
-    // prepend A
+    // C: clone of originals (same order)
+    originals.forEach((node) => {
+      const c = node.cloneNode(true);
+      c.classList.add("is-dup");
+      fragC.appendChild(c);
+    });
+
+    // prepend A then append C
     rail.insertBefore(fragA, rail.firstChild);
-    // append C
     rail.appendChild(fragC);
 
-    const slides = Array.from(rail.children); // length = 3n
-    const startIndex = n; // first slide of middle set (B)
+    const slides = Array.from(rail.children); // 3n
+    const startIndex = n; // first element of middle set (B) => video 1/4
 
     let index = startIndex;
     let jumping = false;
@@ -140,11 +152,12 @@
     const disableSnap = () => rail.classList.add("is-jumping");
     const enableSnap = () => rail.classList.remove("is-jumping");
 
+    const leftForIndex = (i) => (slides[i].offsetLeft - rail.offsetLeft);
+
     const scrollToIndex = (i, smooth = true) => {
       const t = slides[i];
       if (!t) return;
-      const left = t.offsetLeft - rail.offsetLeft;
-      rail.scrollTo({ left, behavior: smooth ? "smooth" : "auto" });
+      rail.scrollTo({ left: leftForIndex(i), behavior: smooth ? "smooth" : "auto" });
     };
 
     const hardJump = (i) => {
@@ -160,7 +173,11 @@
       });
     };
 
-    const realFromIndex = (i) => ((i % n) + n) % n;
+    // map any index -> real slide [0..n-1] preserving order
+    const realFromIndex = (i) => {
+      const r = i % n;
+      return r < 0 ? r + n : r;
+    };
 
     const setUI = () => {
       const real = realFromIndex(index);
@@ -175,33 +192,34 @@
       const cur = rail.scrollLeft;
       let best = 0;
       let bestDist = Infinity;
-      slides.forEach((s, i) => {
-        const d = Math.abs((s.offsetLeft - rail.offsetLeft) - cur);
+
+      // find nearest slide to current scrollLeft
+      for (let i = 0; i < slides.length; i++) {
+        const d = Math.abs(leftForIndex(i) - cur);
         if (d < bestDist) {
           bestDist = d;
           best = i;
         }
-      });
+      }
       return best;
     };
 
-    // Start centered at 1/4 (real 1) in the MIDDLE set
+    // Start exactly at video 1/4 (center)
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        index = startIndex; // real 1/4
+        index = startIndex;
         hardJump(index);
       });
     });
 
-    // Recenter if user drifts into A or C (keeps infinite illusion)
+    // HARD requirement: infinite in both directions, including long continuous scroll on desktop.
+    // Strategy: while scrolling, if we approach edges (A or C), recenter immediately (invisible).
     const recenterIfNeeded = () => {
-      // If we are too far in A (left set), add n to bring back to middle
-      if (index < n * 0.5) {
-        index += n;
+      // middle set is [n .. 2n-1]
+      if (index < n * 0.6) {
+        index += n; // bring to middle
         hardJump(index);
-      }
-      // If we are too far in C (right set), subtract n
-      if (index > n * 2.5) {
+      } else if (index > n * 2.4) {
         index -= n;
         hardJump(index);
       }
@@ -218,12 +236,16 @@
         index = closestIndex();
         setUI();
 
-        // Debounced "scroll end" => recenter invisibly when momentum stops
+        // recenter DURING scrolling too (fix desktop "finite to the right")
+        recenterIfNeeded();
+
+        // also recenter after momentum ends (for mobile)
         if (endTimer) clearTimeout(endTimer);
         endTimer = setTimeout(() => {
           if (jumping) return;
+          index = closestIndex();
           recenterIfNeeded();
-        }, 110);
+        }, 120);
       });
     };
 
