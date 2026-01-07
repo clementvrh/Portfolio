@@ -101,121 +101,158 @@
   }
 
   /* =========================
-     SLIDERS — INFINITE (MOBILE + DESKTOP IDENTIQUE)
+     INFINITE CAROUSEL SLIDER
+     - starts at 1/4 (center)
+     - center snap
+     - neighbors visible
+     - seamless loop (no visible jump)
      ========================= */
 
-  function setupInfiniteSlider(name) {
+  function setupInfiniteCarousel(name) {
     const rail = document.getElementById(`rail-${name}`);
     if (!rail) return;
 
-    const originalSlides = Array.from(rail.children);
-    const total = originalSlides.length;
+    // Prevent double init
+    if (rail.dataset.inited === "1") return;
+    rail.dataset.inited = "1";
 
     const nowEl = document.getElementById(`${name}Now`);
     const totalEl = document.getElementById(`${name}Total`);
-    if (totalEl) totalEl.textContent = String(total).padStart(2, "0");
 
-    // Clone first & last
-    const firstClone = originalSlides[0].cloneNode(true);
-    const lastClone = originalSlides[total - 1].cloneNode(true);
+    // Original slides (before clones)
+    const originals = Array.from(rail.children);
+    const total = originals.length;
+    if (totalEl) totalEl.textContent = String(total).padStart(2, "0");
+    if (total < 2) return;
+
+    // Clone last to head, first to tail
+    const firstClone = originals[0].cloneNode(true);
+    const lastClone = originals[total - 1].cloneNode(true);
     firstClone.classList.add("is-clone");
     lastClone.classList.add("is-clone");
 
-    rail.insertBefore(lastClone, originalSlides[0]);
+    rail.insertBefore(lastClone, originals[0]);
     rail.appendChild(firstClone);
 
     const slides = Array.from(rail.children);
 
+    // Index in "slides" array (with clones). Real first = 1
     let index = 1;
+    let jumping = false;
 
-    const goTo = (i, smooth = true) => {
-      rail.scrollTo({
-        left: slides[i].offsetLeft,
-        behavior: smooth ? "smooth" : "auto",
+    const disableSnap = () => rail.classList.add("is-jumping");
+    const enableSnap = () => rail.classList.remove("is-jumping");
+
+    const scrollToIndex = (i, smooth = true) => {
+      const target = slides[i];
+      if (!target) return;
+
+      const left = target.offsetLeft - rail.offsetLeft;
+      rail.scrollTo({ left, behavior: smooth ? "smooth" : "auto" });
+    };
+
+    const setUI = () => {
+      // current slide class (visual)
+      slides.forEach((s) => s.classList.remove("is-current"));
+      slides[index]?.classList.add("is-current");
+      rail.classList.add("is-focusing");
+
+      // counter: map clones back to real
+      let real = index - 1; // because index=1 => real 0
+      if (real < 0) real = total - 1;
+      if (real >= total) real = 0;
+
+      if (nowEl) nowEl.textContent = String(real + 1).padStart(2, "0");
+    };
+
+    const hardJump = (i) => {
+      jumping = true;
+      disableSnap();
+      scrollToIndex(i, false);
+
+      // re-enable snap next paint
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          enableSnap();
+          jumping = false;
+          setUI();
+        });
       });
     };
 
-    goTo(index, false);
+    // Initial position MUST be after layout
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        hardJump(1); // start on first real slide => 1/4
+      });
+    });
 
-    let isJumping = false;
-
-    const update = () => {
-      if (isJumping) return;
-
-      const railLeft = rail.scrollLeft;
-      let closest = 0;
-      let minDist = Infinity;
-
+    const closestIndex = () => {
+      const cur = rail.scrollLeft;
+      let best = 0;
+      let bestDist = Infinity;
       slides.forEach((s, i) => {
-        const d = Math.abs(s.offsetLeft - railLeft);
-        if (d < minDist) {
-          minDist = d;
-          closest = i;
+        const d = Math.abs((s.offsetLeft - rail.offsetLeft) - cur);
+        if (d < bestDist) {
+          bestDist = d;
+          best = i;
         }
       });
-
-      index = closest;
-
-      rail.classList.add("is-focusing");
-      slides.forEach((s, i) => s.classList.toggle("is-current", i === index));
-
-      if (nowEl) {
-        let realIndex = index - 1;
-        if (realIndex < 0) realIndex = total - 1;
-        if (realIndex >= total) realIndex = 0;
-        nowEl.textContent = String(realIndex + 1).padStart(2, "0");
-      }
-
-      if (index === 0) {
-        isJumping = true;
-        rail.classList.add("is-jumping");
-        requestAnimationFrame(() => {
-          index = total;
-          goTo(index, false);
-          rail.classList.remove("is-jumping");
-          isJumping = false;
-        });
-      }
-
-      if (index === slides.length - 1) {
-        isJumping = true;
-        rail.classList.add("is-jumping");
-        requestAnimationFrame(() => {
-          index = 1;
-          goTo(index, false);
-          rail.classList.remove("is-jumping");
-          isJumping = false;
-        });
-      }
+      return best;
     };
 
-    rail.addEventListener("scroll", () => requestAnimationFrame(update));
-    update();
+    let raf = 0;
+    const onScroll = () => {
+      if (jumping) return;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        index = closestIndex();
+        setUI();
 
+        // Seamless loop
+        if (index === 0) {
+          // at head clone (last)
+          hardJump(total);
+        } else if (index === slides.length - 1) {
+          // at tail clone (first)
+          hardJump(1);
+        }
+      });
+    };
+
+    rail.addEventListener("scroll", onScroll, { passive: true });
+
+    // Arrow buttons
     document.querySelectorAll(`.arrowBtn[data-slider="${name}"]`).forEach((btn) => {
       btn.addEventListener("click", () => {
         const dir = Number(btn.dataset.dir || 1);
         index += dir;
-        goTo(index);
+        scrollToIndex(index, true);
       });
     });
 
+    // Keyboard arrows
     document.addEventListener("keydown", (e) => {
       if (isTyping(document.activeElement)) return;
-      const page = document.body.dataset.page;
-      if ((name === "real" && page !== "real") || (name === "reels" && page !== "reels")) return;
+
+      const page = document.body.getAttribute("data-page");
+      const ok = (name === "real" && page === "real") || (name === "reels" && page === "reels");
+      if (!ok) return;
 
       if (e.key === "ArrowRight") {
-        index++;
-        goTo(index);
+        index += 1;
+        scrollToIndex(index, true);
       }
       if (e.key === "ArrowLeft") {
-        index--;
-        goTo(index);
+        index -= 1;
+        scrollToIndex(index, true);
       }
     });
+
+    // First UI state
+    setUI();
   }
 
-  setupInfiniteSlider("real");
-  setupInfiniteSlider("reels");
+  setupInfiniteCarousel("real");
+  setupInfiniteCarousel("reels");
 })();
