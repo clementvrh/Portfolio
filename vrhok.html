@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>vrhok</title>
+  <link rel="stylesheet" href="./style.css?v=10" />
+</head>
+
+<body data-page="vrhok">
+  <div class="cursor-dot" aria-hidden="true"></div>
+
+  <main class="wrap">
+    <div class="pageHead glass">
+      <h1 class="pageTitle">Code horaire</h1>
+      <p class="pageSub">Page interne — ne pas partager.</p>
+    </div>
+
+    <section class="featured">
+      <div class="glass" style="padding:16px; border-radius:18px;">
+        <div style="color: var(--muted); font-size:13px; margin-bottom:8px;">
+          Code valable pour l’heure UTC en cours
+        </div>
+
+        <div id="code" style="font-size:56px; font-weight:900; letter-spacing:6px; line-height:1; margin:10px 0;">
+          ....
+        </div>
+
+        <div id="info" style="color: var(--muted); font-size:12px; margin-top:8px;"></div>
+
+        <div style="display:flex; gap:10px; margin-top:14px;">
+          <button id="copy" class="lockBtn" type="button">Copier</button>
+          <a class="lockBtn" href="./index.html?v=10">Retour site</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Must match app.js
+    const SECRET = "vrh";
+
+    // Master password for this page (asked every visit)
+    const MASTER = "wyrsev-poxbEc-7parze";
+
+    function getHourlyCode(secret) {
+      const now = new Date();
+      const y = now.getUTCFullYear();
+      const m = now.getUTCMonth() + 1;
+      const d = now.getUTCDate();
+      const h = now.getUTCHours();
+
+      const base = `${secret}${y}${m}${d}${h}`;
+
+      let hash = 0;
+      for (let i = 0; i < base.length; i++) {
+        hash = (hash * 31 + base.charCodeAt(i)) >>> 0;
+      }
+
+      const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+      let code = "";
+      for (let i = 0; i < 4; i++) {
+        code += chars[hash % chars.length];
+        hash = Math.floor(hash / chars.length);
+      }
+      return code;
+    }
+
+    // Lock overlay (NO persistence => re-asks every visit)
+    const overlay = document.createElement("div");
+    overlay.className = "lockOverlay is-on";
+    overlay.innerHTML = `
+      <div class="lockCard">
+        <div class="lockTop">
+          <h2 class="lockTitle">Accès vrhok</h2>
+          <button class="lockClose" type="button" aria-label="Fermer">Fermer</button>
+        </div>
+
+        <p class="lockHint">
+          Entrez le mot de passe pour afficher le code horaire.
+        </p>
+
+        <div class="lockRow">
+          <input class="lockInput" type="password" autocomplete="off"
+                 placeholder="Mot de passe" aria-label="Mot de passe" />
+          <button class="lockBtn" type="button">OK</button>
+        </div>
+
+        <div class="lockError" aria-live="polite"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    document.body.classList.add("is-locked");
+
+    const input = overlay.querySelector(".lockInput");
+    const okBtn = overlay.querySelector(".lockBtn");
+    const closeBtn = overlay.querySelector(".lockClose");
+    const err = overlay.querySelector(".lockError");
+
+    function hideLock() {
+      overlay.classList.remove("is-on");
+      document.body.classList.remove("is-locked");
+    }
+
+    function unlock() {
+      const v = String(input.value || "").trim();
+      if (v === MASTER) {
+        err.textContent = "";
+        hideLock();
+        render();            // show code right away
+        setInterval(render, 1000);
+        return;
+      }
+      err.textContent = "Mot de passe incorrect.";
+      input.select();
+    }
+
+    okBtn.addEventListener("click", unlock);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") unlock();
+    });
+    closeBtn.addEventListener("click", () => {
+      // Close just hides overlay; page still exists (your choice)
+      hideLock();
+    });
+
+    setTimeout(() => input.focus(), 50);
+
+    // Code UI
+    const codeEl = document.getElementById("code");
+    const infoEl = document.getElementById("info");
+    const copyBtn = document.getElementById("copy");
+
+    function render() {
+      const now = new Date();
+      codeEl.textContent = getHourlyCode(SECRET);
+      infoEl.textContent = `UTC: ${now.toUTCString()} — Paris: ${now.toLocaleString("fr-FR")}`;
+    }
+
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(codeEl.textContent);
+        copyBtn.textContent = "Copié ✅";
+        setTimeout(() => (copyBtn.textContent = "Copier"), 900);
+      } catch {
+        // fallback: select text visually (rare)
+        alert("Copie impossible automatiquement — sélectionnez le code manuellement.");
+      }
+    });
+  </script>
+</body>
+</html>

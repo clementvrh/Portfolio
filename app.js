@@ -3,6 +3,150 @@
   const transition = document.querySelector(".page-transition");
 
   /* ======================
+     SOFT LOCK (HOME ONLY)
+     - QR friendly: no lock on load
+     - Locks on first interaction (scroll/click/swipe/key)
+     - Hourly code (4 chars) a-z0-9
+  ====================== */
+
+  const isHome = document.body?.getAttribute("data-page") === "home";
+
+  function getHourlyCode(secret) {
+    const now = new Date();
+
+    // UTC to be stable
+    const y = now.getUTCFullYear();
+    const m = now.getUTCMonth() + 1;
+    const d = now.getUTCDate();
+    const h = now.getUTCHours();
+
+    const base = `${secret}${y}${m}${d}${h}`;
+
+    // simple deterministic hash
+    let hash = 0;
+    for (let i = 0; i < base.length; i++) {
+      hash = (hash * 31 + base.charCodeAt(i)) >>> 0;
+    }
+
+    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    let code = "";
+    for (let i = 0; i < 4; i++) {
+      code += chars[hash % chars.length];
+      hash = Math.floor(hash / chars.length);
+    }
+    return code;
+  }
+
+  if (isHome) {
+    const LOCK = {
+      // 🔑 change this if you want
+      SECRET: "vrh",
+      UNLOCK_MINUTES: 60,
+      KEY: "vrh_unlocked_until",
+    };
+
+    const nowMs = () => Date.now();
+    const isUnlocked = () => {
+      const until = Number(localStorage.getItem(LOCK.KEY) || "0");
+      return Number.isFinite(until) && until > nowMs();
+    };
+
+    // Inject overlay
+    const overlay = document.createElement("div");
+    overlay.className = "lockOverlay";
+    overlay.innerHTML = `
+      <div class="lockCard">
+        <div class="lockTop">
+          <h2 class="lockTitle">Accès privé</h2>
+          <button class="lockClose" type="button" aria-label="Fermer">Plus tard</button>
+        </div>
+
+        <p class="lockHint">
+          Site réservé à la prospection, veuillez contacter le numéro sur la carte de visite pour demander le mot de passe.
+        </p>
+
+        <div class="lockRow">
+          <input class="lockInput" type="password" inputmode="text" autocomplete="off"
+                placeholder="Mot de passe" aria-label="Mot de passe" />
+          <button class="lockBtn" type="button">OK</button>
+        </div>
+
+        <div class="lockError" aria-live="polite"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const input = overlay.querySelector(".lockInput");
+    const okBtn = overlay.querySelector(".lockBtn");
+    const closeBtn = overlay.querySelector(".lockClose");
+    const err = overlay.querySelector(".lockError");
+
+    function showLock() {
+      document.body.classList.add("is-locked");
+      overlay.classList.add("is-on");
+      err.textContent = "";
+      setTimeout(() => input?.focus(), 50);
+    }
+
+    function hideLock() {
+      overlay.classList.remove("is-on");
+      document.body.classList.remove("is-locked");
+    }
+
+    function unlock() {
+      const v = String(input.value || "").trim().toLowerCase();
+      const expected = getHourlyCode(LOCK.SECRET);
+
+      if (v === expected) {
+        const until = nowMs() + LOCK.UNLOCK_MINUTES * 60 * 1000;
+        localStorage.setItem(LOCK.KEY, String(until));
+        hideLock();
+        return;
+      }
+
+      err.textContent = "Code incorrect.";
+      input.select();
+    }
+
+    okBtn.addEventListener("click", unlock);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") unlock();
+    });
+    closeBtn.addEventListener("click", hideLock);
+
+    // Prevent clicks from passing through overlay
+    overlay.addEventListener("pointerdown", (e) => e.stopPropagation());
+    overlay.addEventListener("click", (e) => e.stopPropagation());
+    overlay.addEventListener("wheel", (e) => e.stopPropagation(), { passive: false });
+
+    // First interaction gate (capture)
+    let armed = true;
+
+    function firstInteractionGate(e) {
+      if (!armed) return;
+      if (isUnlocked()) {
+        armed = false;
+        return;
+      }
+      if (overlay.classList.contains("is-on")) return;
+
+      e.preventDefault?.();
+      e.stopPropagation?.();
+      e.stopImmediatePropagation?.();
+
+      showLock();
+      armed = false;
+    }
+
+    window.addEventListener("pointerdown", firstInteractionGate, { capture: true });
+    window.addEventListener("wheel", firstInteractionGate, { capture: true, passive: false });
+    window.addEventListener("touchstart", firstInteractionGate, { capture: true, passive: false });
+    window.addEventListener("keydown", firstInteractionGate, { capture: true });
+
+    if (isUnlocked()) armed = false;
+  }
+
+  /* ======================
      NAVIGATION PAGES
   ====================== */
 
