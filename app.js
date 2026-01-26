@@ -3,7 +3,7 @@
   const transition = document.querySelector(".page-transition");
 
   /* ============================================================
-     ACCESS GATE (HOME ONLY) — (inchangé / version OK)
+     ACCESS GATE (HOME ONLY) — version OK (inchangé)
   ============================================================ */
 
   const ACCESS = {
@@ -220,10 +220,10 @@
     }
 
     const k = e.key.toLowerCase();
-    if (k === "r") return navigate("./real-estate.html?v=13");
-    if (k === "i") return navigate("./reels-interviews.html?v=13");
-    if (k === "p") return navigate("./projets-independants.html?v=13");
-    if (k === "h") return navigate("./index.html?v=13");
+    if (k === "r") return navigate("./real-estate.html?v=14");
+    if (k === "i") return navigate("./reels-interviews.html?v=14");
+    if (k === "p") return navigate("./projets-independants.html?v=14");
+    if (k === "h") return navigate("./index.html?v=14");
   });
 
   /* ======================
@@ -263,7 +263,7 @@
   }
 
   /* ======================
-     MOBILE: VIDEO SHIELD (inchangé)
+     MOBILE: VIDEO SHIELD
   ====================== */
 
   function setupVideoShields() {
@@ -307,10 +307,7 @@
 
   /* ============================================================
      INFINITE CAROUSEL (TRANSFORM-BASED)
-     ✅ FIX MOBILE GESTURE:
-       - do NOT capture drag immediately
-       - only start dragging if gesture is clearly horizontal
-       - taps won't trigger snap/jumps
+     ✅ Fix mobile: use TOUCH (reliable), desktop keeps POINTER.
   ============================================================ */
 
   function setupTransformCarousel(name) {
@@ -379,13 +376,12 @@
 
     let x = 0;
     let targetX = 0;
+    let dragging = false;
 
-    // ✅ NEW: gesture state
-    let pointerId = null;
     let startPX = 0;
     let startPY = 0;
     let startTarget = 0;
-    let dragging = false;
+
     let intentDecided = false;
     let intentIsHorizontal = false;
 
@@ -412,7 +408,6 @@
 
     function recenterIfNeeded() {
       const p = -x;
-      // ✅ slightly wider window to reduce “jumps” on mobile
       const min = step * (n * 0.25);
       const max = step * (n * 1.75);
 
@@ -428,7 +423,6 @@
     function render() {
       const ease = dragging ? 0.22 : 0.14;
       x += (targetX - x) * ease;
-
       if (Math.abs(targetX - x) < 0.02) x = targetX;
 
       recenterIfNeeded();
@@ -455,79 +449,88 @@
       goTo(r, true);
     }
 
-    // ✅ NEW: only start drag if horizontal gesture
-    rail.addEventListener("pointerdown", (e) => {
-      // if clicking on a button or link inside a slide, let it through
-      // (not used much here, but safe)
-      pointerId = e.pointerId;
-      startPX = e.clientX;
-      startPY = e.clientY;
-      startTarget = targetX;
+    /* ---------- DESKTOP: pointer drag (comme avant) ---------- */
+    if (!isCoarse) {
+      rail.addEventListener("pointerdown", (e) => {
+        dragging = true;
+        rail.setPointerCapture(e.pointerId);
+        startPX = e.clientX;
+        startTarget = targetX;
+        rail.classList.add("is-dragging");
+      });
 
-      dragging = false;
-      intentDecided = false;
-      intentIsHorizontal = false;
+      rail.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        const dx = e.clientX - startPX;
+        targetX = startTarget + dx;
+      });
 
-      rail.classList.add("is-armed");
-    });
-
-    rail.addEventListener("pointermove", (e) => {
-      if (pointerId == null || e.pointerId !== pointerId) return;
-
-      const dx = e.clientX - startPX;
-      const dy = e.clientY - startPY;
-
-      // Decide intent once (small deadzone)
-      if (!intentDecided) {
-        const adx = Math.abs(dx);
-        const ady = Math.abs(dy);
-
-        if (adx < 6 && ady < 6) return; // deadzone
-        intentDecided = true;
-
-        // horizontal wins
-        intentIsHorizontal = adx > ady;
-
-        if (intentIsHorizontal) {
-          dragging = true;
-          rail.classList.add("is-dragging");
-          // Capture only AFTER we know it's horizontal (✅ big mobile fix)
-          rail.setPointerCapture(pointerId);
-        } else {
-          // vertical intent => don't drag, let page scroll
-          pointerId = null;
-          rail.classList.remove("is-armed");
-          return;
-        }
+      function endDrag() {
+        if (!dragging) return;
+        dragging = false;
+        rail.classList.remove("is-dragging");
+        snapToNearest();
       }
 
-      if (!dragging) return;
-
-      // if horizontal dragging => prevent default scrolling on mobile
-      e.preventDefault?.();
-      targetX = startTarget + dx;
-    });
-
-    function endDrag() {
-      rail.classList.remove("is-armed");
-      if (!dragging) {
-        // tap: do nothing (prevents unwanted snap “jumps”)
-        pointerId = null;
-        intentDecided = false;
-        return;
-      }
-
-      dragging = false;
-      rail.classList.remove("is-dragging");
-      pointerId = null;
-      intentDecided = false;
-
-      snapToNearest();
+      rail.addEventListener("pointerup", endDrag);
+      rail.addEventListener("pointercancel", endDrag);
+      rail.addEventListener("lostpointercapture", endDrag);
     }
 
-    rail.addEventListener("pointerup", endDrag);
-    rail.addEventListener("pointercancel", endDrag);
-    rail.addEventListener("lostpointercapture", endDrag);
+    /* ---------- MOBILE: touch gesture intent horizontal ---------- */
+    if (isCoarse) {
+      rail.addEventListener("touchstart", (e) => {
+        if (!e.touches || e.touches.length !== 1) return;
+        const t = e.touches[0];
+
+        startPX = t.clientX;
+        startPY = t.clientY;
+        startTarget = targetX;
+
+        dragging = false;
+        intentDecided = false;
+        intentIsHorizontal = false;
+      }, { passive: true });
+
+      rail.addEventListener("touchmove", (e) => {
+        if (!e.touches || e.touches.length !== 1) return;
+        const t = e.touches[0];
+        const dx = t.clientX - startPX;
+        const dy = t.clientY - startPY;
+
+        if (!intentDecided) {
+          const adx = Math.abs(dx);
+          const ady = Math.abs(dy);
+          if (adx < 4 && ady < 4) return;
+
+          intentDecided = true;
+          intentIsHorizontal = adx > ady;
+          dragging = intentIsHorizontal;
+
+          if (dragging) rail.classList.add("is-dragging");
+        }
+
+        if (!dragging) return;
+
+        // Horizontal drag => prevent page scrolling
+        e.preventDefault();
+        targetX = startTarget + dx;
+      }, { passive: false });
+
+      rail.addEventListener("touchend", () => {
+        if (!dragging) return;
+        dragging = false;
+        rail.classList.remove("is-dragging");
+        snapToNearest();
+      });
+
+      rail.addEventListener("touchcancel", () => {
+        if (!dragging) return;
+        dragging = false;
+        rail.classList.remove("is-dragging");
+        snapToNearest();
+      });
+    }
 
     // Wheel (desktop)
     rail.addEventListener(
@@ -536,7 +539,6 @@
         e.preventDefault();
         const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
         targetX -= delta;
-
         if (rail._snapT) clearTimeout(rail._snapT);
         rail._snapT = setTimeout(() => snapToNearest(), 140);
       },
