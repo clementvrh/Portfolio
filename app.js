@@ -3,16 +3,11 @@
   const transition = document.querySelector(".page-transition");
 
   /* ============================================================
-     ACCESS GATE (HOME ONLY)
-     - Trigger: first interaction OR keyboard shortcuts
-     - Mandatory (no close button)
-     - Hourly code (4 chars a-z0-9) based on UTC + SECRET
-     - Stores unlock for 60 minutes in localStorage
-     - FIX: typing inside popup input works (keyboard shortcuts won't block input)
+     ACCESS GATE (HOME ONLY) — (inchangé / version OK)
   ============================================================ */
 
   const ACCESS = {
-    SECRET: "vrh",                 // must match vrhok.html
+    SECRET: "vrh",
     UNLOCK_MINUTES: 60,
     KEY: "vrh_unlocked_until",
   };
@@ -29,13 +24,10 @@
     const m = now.getUTCMonth() + 1;
     const d = now.getUTCDate();
     const h = now.getUTCHours();
-
     const base = `${ACCESS.SECRET}${y}${m}${d}${h}`;
 
     let hash = 0;
-    for (let i = 0; i < base.length; i++) {
-      hash = (hash * 31 + base.charCodeAt(i)) >>> 0;
-    }
+    for (let i = 0; i < base.length; i++) hash = (hash * 31 + base.charCodeAt(i)) >>> 0;
 
     const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
     let code = "";
@@ -46,10 +38,9 @@
     return code;
   }
 
-  // Helpers: detect typing context (so we don't hijack keyboard)
   function isTypingTarget(t) {
     if (!t) return false;
-    if (t.closest?.(".lockOverlay")) return true; // typing inside our popup
+    if (t.closest?.(".lockOverlay")) return true;
     const tag = (t.tagName || "").toLowerCase();
     if (tag === "input" || tag === "textarea" || tag === "select") return true;
     if (t.isContentEditable) return true;
@@ -113,19 +104,9 @@
       if (e.key === "Enter") unlock();
     });
 
-    // Block scrolling behind overlay (but DO NOT block typing/clicking inside input)
-    gateOverlay.addEventListener(
-      "wheel",
-      (e) => e.preventDefault(),
-      { passive: false }
-    );
-    gateOverlay.addEventListener(
-      "touchmove",
-      (e) => e.preventDefault(),
-      { passive: false }
-    );
+    gateOverlay.addEventListener("wheel", (e) => e.preventDefault(), { passive: false });
+    gateOverlay.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
 
-    // If user clicks outside card, refocus input
     gateOverlay.addEventListener(
       "pointerdown",
       (e) => {
@@ -157,7 +138,6 @@
     return !!(gateOverlay && gateOverlay.classList.contains("is-on"));
   }
 
-  // Arm/disarm first-interaction listeners so they don't interfere with OK
   const gateListeners = [];
   function addGateListener(target, type, handler, options) {
     target.addEventListener(type, handler, options);
@@ -173,32 +153,20 @@
   function gateIfNeededAndBlock(e) {
     if (!gateEnabled) return false;
     if (isUnlocked()) return false;
-
-    // If overlay is already visible, do NOT block keystrokes (let user type)
     if (gateIsVisible()) return true;
 
-    if (e) {
-      e.preventDefault?.();
-      e.stopPropagation?.();
-      e.stopImmediatePropagation?.();
-    }
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    e?.stopImmediatePropagation?.();
     showGate();
     return true;
   }
 
-  // Gate triggers: first interaction OR keyboard usage (only once)
   if (gateEnabled && !isUnlocked()) {
-    const onFirstPointer = (e) => {
-      if (gateIfNeededAndBlock(e)) removeGateListeners();
-    };
-    const onFirstWheel = (e) => {
-      if (gateIfNeededAndBlock(e)) removeGateListeners();
-    };
-    const onFirstTouch = (e) => {
-      if (gateIfNeededAndBlock(e)) removeGateListeners();
-    };
+    const onFirstPointer = (e) => { if (gateIfNeededAndBlock(e)) removeGateListeners(); };
+    const onFirstWheel = (e) => { if (gateIfNeededAndBlock(e)) removeGateListeners(); };
+    const onFirstTouch = (e) => { if (gateIfNeededAndBlock(e)) removeGateListeners(); };
     const onFirstKey = (e) => {
-      // If user is already typing somewhere, don't hijack
       if (isTypingTarget(e.target)) return;
       if (gateIfNeededAndBlock(e)) removeGateListeners();
     };
@@ -223,7 +191,6 @@
   };
 
   document.addEventListener("click", (e) => {
-    // If home is locked, enforce gate on link click
     if (gateEnabled && !isUnlocked() && !gateIsVisible()) {
       if (gateIfNeededAndBlock(e)) return;
     }
@@ -242,24 +209,21 @@
 
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-
-    // ✅ Allow normal typing in inputs / popup
     if (isTypingTarget(e.target)) return;
 
-    // ✅ Block hotkeys bypass on home if locked (but don't block if popup already open)
     if (gateEnabled && !isUnlocked()) {
       if (!gateIsVisible()) {
         if (gateIfNeededAndBlock(e)) return;
       } else {
-        return; // popup open => do nothing
+        return;
       }
     }
 
     const k = e.key.toLowerCase();
-    if (k === "r") return navigate("./real-estate.html?v=12");
-    if (k === "i") return navigate("./reels-interviews.html?v=12");
-    if (k === "p") return navigate("./projets-independants.html?v=12");
-    if (k === "h") return navigate("./index.html?v=12");
+    if (k === "r") return navigate("./real-estate.html?v=13");
+    if (k === "i") return navigate("./reels-interviews.html?v=13");
+    if (k === "p") return navigate("./projets-independants.html?v=13");
+    if (k === "h") return navigate("./index.html?v=13");
   });
 
   /* ======================
@@ -299,7 +263,7 @@
   }
 
   /* ======================
-     MOBILE: VIDEO SHIELD
+     MOBILE: VIDEO SHIELD (inchangé)
   ====================== */
 
   function setupVideoShields() {
@@ -341,9 +305,13 @@
     });
   }
 
-  /* ======================
+  /* ============================================================
      INFINITE CAROUSEL (TRANSFORM-BASED)
-  ====================== */
+     ✅ FIX MOBILE GESTURE:
+       - do NOT capture drag immediately
+       - only start dragging if gesture is clearly horizontal
+       - taps won't trigger snap/jumps
+  ============================================================ */
 
   function setupTransformCarousel(name) {
     const rail = document.getElementById(`rail-${name}`);
@@ -411,9 +379,16 @@
 
     let x = 0;
     let targetX = 0;
-    let dragging = false;
+
+    // ✅ NEW: gesture state
+    let pointerId = null;
     let startPX = 0;
+    let startPY = 0;
     let startTarget = 0;
+    let dragging = false;
+    let intentDecided = false;
+    let intentIsHorizontal = false;
+
     let realIndex = 0;
 
     function clampReal(r) {
@@ -437,8 +412,9 @@
 
     function recenterIfNeeded() {
       const p = -x;
-      const min = step * (n * 0.35);
-      const max = step * (n * 1.65);
+      // ✅ slightly wider window to reduce “jumps” on mobile
+      const min = step * (n * 0.25);
+      const max = step * (n * 1.75);
 
       if (p < min) {
         x -= setW;
@@ -452,6 +428,7 @@
     function render() {
       const ease = dragging ? 0.22 : 0.14;
       x += (targetX - x) * ease;
+
       if (Math.abs(targetX - x) < 0.02) x = targetX;
 
       recenterIfNeeded();
@@ -478,24 +455,73 @@
       goTo(r, true);
     }
 
+    // ✅ NEW: only start drag if horizontal gesture
     rail.addEventListener("pointerdown", (e) => {
-      dragging = true;
-      rail.setPointerCapture(e.pointerId);
+      // if clicking on a button or link inside a slide, let it through
+      // (not used much here, but safe)
+      pointerId = e.pointerId;
       startPX = e.clientX;
+      startPY = e.clientY;
       startTarget = targetX;
-      rail.classList.add("is-dragging");
+
+      dragging = false;
+      intentDecided = false;
+      intentIsHorizontal = false;
+
+      rail.classList.add("is-armed");
     });
 
     rail.addEventListener("pointermove", (e) => {
-      if (!dragging) return;
+      if (pointerId == null || e.pointerId !== pointerId) return;
+
       const dx = e.clientX - startPX;
+      const dy = e.clientY - startPY;
+
+      // Decide intent once (small deadzone)
+      if (!intentDecided) {
+        const adx = Math.abs(dx);
+        const ady = Math.abs(dy);
+
+        if (adx < 6 && ady < 6) return; // deadzone
+        intentDecided = true;
+
+        // horizontal wins
+        intentIsHorizontal = adx > ady;
+
+        if (intentIsHorizontal) {
+          dragging = true;
+          rail.classList.add("is-dragging");
+          // Capture only AFTER we know it's horizontal (✅ big mobile fix)
+          rail.setPointerCapture(pointerId);
+        } else {
+          // vertical intent => don't drag, let page scroll
+          pointerId = null;
+          rail.classList.remove("is-armed");
+          return;
+        }
+      }
+
+      if (!dragging) return;
+
+      // if horizontal dragging => prevent default scrolling on mobile
+      e.preventDefault?.();
       targetX = startTarget + dx;
     });
 
     function endDrag() {
-      if (!dragging) return;
+      rail.classList.remove("is-armed");
+      if (!dragging) {
+        // tap: do nothing (prevents unwanted snap “jumps”)
+        pointerId = null;
+        intentDecided = false;
+        return;
+      }
+
       dragging = false;
       rail.classList.remove("is-dragging");
+      pointerId = null;
+      intentDecided = false;
+
       snapToNearest();
     }
 
@@ -503,6 +529,7 @@
     rail.addEventListener("pointercancel", endDrag);
     rail.addEventListener("lostpointercapture", endDrag);
 
+    // Wheel (desktop)
     rail.addEventListener(
       "wheel",
       (e) => {
@@ -516,6 +543,7 @@
       { passive: false }
     );
 
+    // Arrows buttons
     document.querySelectorAll(`.arrowBtn[data-slider="${name}"]`).forEach((btn) => {
       btn.addEventListener("click", () => {
         const dir = Number(btn.dataset.dir || 1);
@@ -523,6 +551,7 @@
       });
     });
 
+    // Keyboard arrows for pages
     document.addEventListener("keydown", (e) => {
       const page = document.body.getAttribute("data-page");
       const ok = (name === "real" && page === "real") || (name === "reels" && page === "reels");
