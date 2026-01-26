@@ -8,10 +8,7 @@
      - Mandatory (no close button)
      - Hourly code (4 chars a-z0-9) based on UTC + SECRET
      - Stores unlock for 60 minutes in localStorage
-     - Fixes:
-       • OK works (no event interference)
-       • keyboard shortcuts cannot bypass
-       • overlay doesn't permanently hijack events
+     - FIX: typing inside popup input works (keyboard shortcuts won't block input)
   ============================================================ */
 
   const ACCESS = {
@@ -21,6 +18,7 @@
   };
 
   const page = document.body?.getAttribute("data-page");
+  const gateEnabled = page === "home";
 
   const nowMs = () => Date.now();
   const isUnlocked = () => Number(localStorage.getItem(ACCESS.KEY) || "0") > nowMs();
@@ -46,6 +44,16 @@
       hash = Math.floor(hash / chars.length);
     }
     return code;
+  }
+
+  // Helpers: detect typing context (so we don't hijack keyboard)
+  function isTypingTarget(t) {
+    if (!t) return false;
+    if (t.closest?.(".lockOverlay")) return true; // typing inside our popup
+    const tag = (t.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") return true;
+    if (t.isContentEditable) return true;
+    return false;
   }
 
   let gateOverlay = null;
@@ -97,6 +105,7 @@
       }
       gateErr.textContent = "Mot de passe incorrect.";
       gateInput.select();
+      gateInput.focus();
     }
 
     okBtn.addEventListener("click", unlock);
@@ -104,24 +113,30 @@
       if (e.key === "Enter") unlock();
     });
 
-    // IMPORTANT : ne pas empêcher les events sur l'input/bouton (sinon iOS/desktop bugs)
-    // On bloque uniquement scroll/drag derrière.
-    gateOverlay.addEventListener("wheel", (e) => {
-      e.preventDefault();
-    }, { passive: false });
+    // Block scrolling behind overlay (but DO NOT block typing/clicking inside input)
+    gateOverlay.addEventListener(
+      "wheel",
+      (e) => e.preventDefault(),
+      { passive: false }
+    );
+    gateOverlay.addEventListener(
+      "touchmove",
+      (e) => e.preventDefault(),
+      { passive: false }
+    );
 
-    gateOverlay.addEventListener("touchmove", (e) => {
-      e.preventDefault();
-    }, { passive: false });
-
-    // Si on tap/click sur l’overlay en dehors de la card => on refocus l’input
-    gateOverlay.addEventListener("pointerdown", (e) => {
-      const card = gateOverlay.querySelector(".lockCard");
-      if (card && !card.contains(e.target)) {
-        e.preventDefault();
-        setTimeout(() => gateInput?.focus(), 0);
-      }
-    }, { passive: false });
+    // If user clicks outside card, refocus input
+    gateOverlay.addEventListener(
+      "pointerdown",
+      (e) => {
+        const card = gateOverlay.querySelector(".lockCard");
+        if (card && !card.contains(e.target)) {
+          e.preventDefault();
+          setTimeout(() => gateInput?.focus(), 0);
+        }
+      },
+      { passive: false }
+    );
   }
 
   function showGate() {
@@ -138,10 +153,11 @@
     document.body.classList.remove("is-locked");
   }
 
-  // Active uniquement sur la HOME
-  const gateEnabled = page === "home";
+  function gateIsVisible() {
+    return !!(gateOverlay && gateOverlay.classList.contains("is-on"));
+  }
 
-  // Arm/disarm listeners to avoid interference with OK
+  // Arm/disarm first-interaction listeners so they don't interfere with OK
   const gateListeners = [];
   function addGateListener(target, type, handler, options) {
     target.addEventListener(type, handler, options);
@@ -158,7 +174,9 @@
     if (!gateEnabled) return false;
     if (isUnlocked()) return false;
 
-    // Show gate and block the attempted interaction / navigation
+    // If overlay is already visible, do NOT block keystrokes (let user type)
+    if (gateIsVisible()) return true;
+
     if (e) {
       e.preventDefault?.();
       e.stopPropagation?.();
@@ -168,25 +186,21 @@
     return true;
   }
 
-  // Gate triggers: first interaction OR keyboard usage
+  // Gate triggers: first interaction OR keyboard usage (only once)
   if (gateEnabled && !isUnlocked()) {
     const onFirstPointer = (e) => {
-      // only trigger once, then remove listeners so OK works normally
-      gateIfNeededAndBlock(e);
-      removeGateListeners();
+      if (gateIfNeededAndBlock(e)) removeGateListeners();
     };
     const onFirstWheel = (e) => {
-      gateIfNeededAndBlock(e);
-      removeGateListeners();
+      if (gateIfNeededAndBlock(e)) removeGateListeners();
     };
     const onFirstTouch = (e) => {
-      gateIfNeededAndBlock(e);
-      removeGateListeners();
+      if (gateIfNeededAndBlock(e)) removeGateListeners();
     };
     const onFirstKey = (e) => {
-      // Important: block keyboard shortcuts bypass too
-      gateIfNeededAndBlock(e);
-      removeGateListeners();
+      // If user is already typing somewhere, don't hijack
+      if (isTypingTarget(e.target)) return;
+      if (gateIfNeededAndBlock(e)) removeGateListeners();
     };
 
     addGateListener(window, "pointerdown", onFirstPointer, { capture: true });
@@ -209,9 +223,8 @@
   };
 
   document.addEventListener("click", (e) => {
-    // If home is locked, block link navigation (extra safety)
-    if (gateEnabled && !isUnlocked()) {
-      // If click happens while lock not yet triggered (rare), enforce now
+    // If home is locked, enforce gate on link click
+    if (gateEnabled && !isUnlocked() && !gateIsVisible()) {
       if (gateIfNeededAndBlock(e)) return;
     }
 
@@ -230,16 +243,23 @@
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
-    // ✅ Block hotkeys bypass on home if locked
+    // ✅ Allow normal typing in inputs / popup
+    if (isTypingTarget(e.target)) return;
+
+    // ✅ Block hotkeys bypass on home if locked (but don't block if popup already open)
     if (gateEnabled && !isUnlocked()) {
-      if (gateIfNeededAndBlock(e)) return;
+      if (!gateIsVisible()) {
+        if (gateIfNeededAndBlock(e)) return;
+      } else {
+        return; // popup open => do nothing
+      }
     }
 
     const k = e.key.toLowerCase();
-    if (k === "r") return navigate("./real-estate.html?v=11");
-    if (k === "i") return navigate("./reels-interviews.html?v=11");
-    if (k === "p") return navigate("./projets-independants.html?v=11");
-    if (k === "h") return navigate("./index.html?v=11");
+    if (k === "r") return navigate("./real-estate.html?v=12");
+    if (k === "i") return navigate("./reels-interviews.html?v=12");
+    if (k === "p") return navigate("./projets-independants.html?v=12");
+    if (k === "h") return navigate("./index.html?v=12");
   });
 
   /* ======================
