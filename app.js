@@ -2,59 +2,62 @@
   const isCoarse = window.matchMedia("(pointer: coarse)").matches;
   const transition = document.querySelector(".page-transition");
 
-  /* ======================
-     SOFT LOCK (HOME ONLY)
-     - Triggers on first interaction (scroll/click/swipe/keyboard)
-     - No "Plus tard" => mandatory
-     - Hourly code (4 chars a-z0-9)
-     - Stores unlock for 60 minutes
-  ====================== */
+  /* ============================================================
+     ACCESS GATE (HOME ONLY)
+     - Trigger: first interaction OR keyboard shortcuts
+     - Mandatory (no close button)
+     - Hourly code (4 chars a-z0-9) based on UTC + SECRET
+     - Stores unlock for 60 minutes in localStorage
+     - Fixes:
+       • OK works (no event interference)
+       • keyboard shortcuts cannot bypass
+       • overlay doesn't permanently hijack events
+  ============================================================ */
 
-  (function setupHomeSoftLock() {
-    // ✅ uniquement la home
-    const page = document.body?.getAttribute("data-page");
-    if (page !== "home") return;
+  const ACCESS = {
+    SECRET: "vrh",                 // must match vrhok.html
+    UNLOCK_MINUTES: 60,
+    KEY: "vrh_unlocked_until",
+  };
 
-    const LOCK = {
-      SECRET: "vrh", // 🔑 change si tu veux (doit matcher vrhok.html)
-      UNLOCK_MINUTES: 60,
-      KEY: "vrh_unlocked_until",
-    };
+  const page = document.body?.getAttribute("data-page");
 
-    const nowMs = () => Date.now();
+  const nowMs = () => Date.now();
+  const isUnlocked = () => Number(localStorage.getItem(ACCESS.KEY) || "0") > nowMs();
 
-    const isUnlocked = () => {
-      const until = Number(localStorage.getItem(LOCK.KEY) || "0");
-      return Number.isFinite(until) && until > nowMs();
-    };
+  function getHourlyCodeUTC() {
+    const now = new Date();
+    const y = now.getUTCFullYear();
+    const m = now.getUTCMonth() + 1;
+    const d = now.getUTCDate();
+    const h = now.getUTCHours();
 
-    function getHourlyCode() {
-      const now = new Date();
-      const y = now.getUTCFullYear();
-      const m = now.getUTCMonth() + 1;
-      const d = now.getUTCDate();
-      const h = now.getUTCHours();
+    const base = `${ACCESS.SECRET}${y}${m}${d}${h}`;
 
-      const base = `${LOCK.SECRET}${y}${m}${d}${h}`;
-
-      let hash = 0;
-      for (let i = 0; i < base.length; i++) {
-        hash = (hash * 31 + base.charCodeAt(i)) >>> 0;
-      }
-
-      const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-      let code = "";
-      for (let i = 0; i < 4; i++) {
-        code += chars[hash % chars.length];
-        hash = Math.floor(hash / chars.length);
-      }
-      return code;
+    let hash = 0;
+    for (let i = 0; i < base.length; i++) {
+      hash = (hash * 31 + base.charCodeAt(i)) >>> 0;
     }
 
-    // Overlay DOM injecté (pas besoin de toucher index.html)
-    const overlay = document.createElement("div");
-    overlay.className = "lockOverlay";
-    overlay.innerHTML = `
+    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    let code = "";
+    for (let i = 0; i < 4; i++) {
+      code += chars[hash % chars.length];
+      hash = Math.floor(hash / chars.length);
+    }
+    return code;
+  }
+
+  let gateOverlay = null;
+  let gateInput = null;
+  let gateErr = null;
+
+  function buildGateOverlayIfNeeded() {
+    if (gateOverlay) return;
+
+    gateOverlay = document.createElement("div");
+    gateOverlay.className = "lockOverlay";
+    gateOverlay.innerHTML = `
       <div class="lockCard" role="dialog" aria-modal="true" aria-label="Accès privé">
         <h2 class="lockTitle">Accès privé</h2>
 
@@ -63,86 +66,134 @@
         </p>
 
         <div class="lockRow">
-          <input class="lockInput" type="text" inputmode="text" autocapitalize="none" autocomplete="off"
-                 placeholder="Mot de passe" aria-label="Mot de passe" />
+          <input class="lockInput"
+                 type="text"
+                 inputmode="text"
+                 autocapitalize="none"
+                 autocomplete="off"
+                 placeholder="Mot de passe"
+                 aria-label="Mot de passe" />
           <button class="lockBtn" type="button">OK</button>
         </div>
 
         <div class="lockError" aria-live="polite"></div>
       </div>
     `;
-    document.body.appendChild(overlay);
+    document.body.appendChild(gateOverlay);
 
-    const input = overlay.querySelector(".lockInput");
-    const okBtn = overlay.querySelector(".lockBtn");
-    const err = overlay.querySelector(".lockError");
-
-    function showLock() {
-      document.body.classList.add("is-locked");
-      overlay.classList.add("is-on");
-      err.textContent = "";
-      setTimeout(() => input?.focus(), 50);
-    }
-
-    function hideLock() {
-      overlay.classList.remove("is-on");
-      document.body.classList.remove("is-locked");
-    }
+    gateInput = gateOverlay.querySelector(".lockInput");
+    const okBtn = gateOverlay.querySelector(".lockBtn");
+    gateErr = gateOverlay.querySelector(".lockError");
 
     function unlock() {
-      const v = String(input.value || "").trim().toLowerCase();
-      const expected = getHourlyCode();
+      const v = String(gateInput.value || "").trim().toLowerCase();
+      const expected = getHourlyCodeUTC();
 
       if (v === expected) {
-        const until = nowMs() + LOCK.UNLOCK_MINUTES * 60 * 1000;
-        localStorage.setItem(LOCK.KEY, String(until));
-        hideLock();
+        const until = nowMs() + ACCESS.UNLOCK_MINUTES * 60 * 1000;
+        localStorage.setItem(ACCESS.KEY, String(until));
+        hideGate();
         return;
       }
-      err.textContent = "Mot de passe incorrect.";
-      input.select();
+      gateErr.textContent = "Mot de passe incorrect.";
+      gateInput.select();
     }
 
     okBtn.addEventListener("click", unlock);
-    input.addEventListener("keydown", (e) => {
+    gateInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") unlock();
     });
 
-    // Empêche tout clic/scroll de passer à travers l’overlay
-    overlay.addEventListener("pointerdown", (e) => e.stopPropagation(), { capture: true });
-    overlay.addEventListener("click", (e) => e.stopPropagation(), { capture: true });
-    overlay.addEventListener("wheel", (e) => {
+    // IMPORTANT : ne pas empêcher les events sur l'input/bouton (sinon iOS/desktop bugs)
+    // On bloque uniquement scroll/drag derrière.
+    gateOverlay.addEventListener("wheel", (e) => {
       e.preventDefault();
-      e.stopPropagation();
-    }, { passive: false, capture: true });
-    overlay.addEventListener("touchmove", (e) => {
+    }, { passive: false });
+
+    gateOverlay.addEventListener("touchmove", (e) => {
       e.preventDefault();
-      e.stopPropagation();
-    }, { passive: false, capture: true });
+    }, { passive: false });
 
-    // Déclencheur 1ère interaction (capture = avant navigation / sliders)
-    let armed = true;
+    // Si on tap/click sur l’overlay en dehors de la card => on refocus l’input
+    gateOverlay.addEventListener("pointerdown", (e) => {
+      const card = gateOverlay.querySelector(".lockCard");
+      if (card && !card.contains(e.target)) {
+        e.preventDefault();
+        setTimeout(() => gateInput?.focus(), 0);
+      }
+    }, { passive: false });
+  }
 
-    function firstInteractionGate(e) {
-      if (!armed) return;
-      if (isUnlocked()) { armed = false; return; }
-      if (overlay.classList.contains("is-on")) return;
+  function showGate() {
+    buildGateOverlayIfNeeded();
+    document.body.classList.add("is-locked");
+    gateOverlay.classList.add("is-on");
+    gateErr.textContent = "";
+    setTimeout(() => gateInput?.focus(), 50);
+  }
 
+  function hideGate() {
+    if (!gateOverlay) return;
+    gateOverlay.classList.remove("is-on");
+    document.body.classList.remove("is-locked");
+  }
+
+  // Active uniquement sur la HOME
+  const gateEnabled = page === "home";
+
+  // Arm/disarm listeners to avoid interference with OK
+  const gateListeners = [];
+  function addGateListener(target, type, handler, options) {
+    target.addEventListener(type, handler, options);
+    gateListeners.push([target, type, handler, options]);
+  }
+  function removeGateListeners() {
+    while (gateListeners.length) {
+      const [t, type, h, opt] = gateListeners.pop();
+      t.removeEventListener(type, h, opt);
+    }
+  }
+
+  function gateIfNeededAndBlock(e) {
+    if (!gateEnabled) return false;
+    if (isUnlocked()) return false;
+
+    // Show gate and block the attempted interaction / navigation
+    if (e) {
       e.preventDefault?.();
       e.stopPropagation?.();
       e.stopImmediatePropagation?.();
-
-      showLock();
-      armed = false;
     }
+    showGate();
+    return true;
+  }
 
-    window.addEventListener("pointerdown", firstInteractionGate, { capture: true });
-    window.addEventListener("wheel", firstInteractionGate, { capture: true, passive: false });
-    window.addEventListener("touchstart", firstInteractionGate, { capture: true, passive: false });
-    window.addEventListener("keydown", firstInteractionGate, { capture: true });
+  // Gate triggers: first interaction OR keyboard usage
+  if (gateEnabled && !isUnlocked()) {
+    const onFirstPointer = (e) => {
+      // only trigger once, then remove listeners so OK works normally
+      gateIfNeededAndBlock(e);
+      removeGateListeners();
+    };
+    const onFirstWheel = (e) => {
+      gateIfNeededAndBlock(e);
+      removeGateListeners();
+    };
+    const onFirstTouch = (e) => {
+      gateIfNeededAndBlock(e);
+      removeGateListeners();
+    };
+    const onFirstKey = (e) => {
+      // Important: block keyboard shortcuts bypass too
+      gateIfNeededAndBlock(e);
+      removeGateListeners();
+    };
 
-    if (isUnlocked()) armed = false;
-  })();
+    addGateListener(window, "pointerdown", onFirstPointer, { capture: true });
+    addGateListener(window, "wheel", onFirstWheel, { capture: true, passive: false });
+    addGateListener(window, "touchstart", onFirstTouch, { capture: true, passive: false });
+    addGateListener(window, "keydown", onFirstKey, { capture: true });
+  }
 
   /* ======================
      NAVIGATION PAGES
@@ -158,6 +209,12 @@
   };
 
   document.addEventListener("click", (e) => {
+    // If home is locked, block link navigation (extra safety)
+    if (gateEnabled && !isUnlocked()) {
+      // If click happens while lock not yet triggered (rare), enforce now
+      if (gateIfNeededAndBlock(e)) return;
+    }
+
     const a = e.target.closest("a");
     if (!a) return;
     const href = a.getAttribute("href");
@@ -173,11 +230,16 @@
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
+    // ✅ Block hotkeys bypass on home if locked
+    if (gateEnabled && !isUnlocked()) {
+      if (gateIfNeededAndBlock(e)) return;
+    }
+
     const k = e.key.toLowerCase();
-    if (k === "r") return navigate("./real-estate.html?v=10");
-    if (k === "i") return navigate("./reels-interviews.html?v=10");
-    if (k === "p") return navigate("./projets-independants.html?v=10");
-    if (k === "h") return navigate("./index.html?v=10");
+    if (k === "r") return navigate("./real-estate.html?v=11");
+    if (k === "i") return navigate("./reels-interviews.html?v=11");
+    if (k === "p") return navigate("./projets-independants.html?v=11");
+    if (k === "h") return navigate("./index.html?v=11");
   });
 
   /* ======================
@@ -370,7 +432,6 @@
     function render() {
       const ease = dragging ? 0.22 : 0.14;
       x += (targetX - x) * ease;
-
       if (Math.abs(targetX - x) < 0.02) x = targetX;
 
       recenterIfNeeded();

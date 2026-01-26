@@ -11,7 +11,6 @@
       --fg:#f5f6ff;
       --muted:rgba(245,246,255,.72);
       --line:rgba(255,255,255,.14);
-      --glass:rgba(255,255,255,.06);
     }
 
     html,body{min-height:100%}
@@ -25,10 +24,9 @@
         radial-gradient(1200px 900px at 50% 120%, rgba(255,255,255,.06), transparent 70%),
         var(--bg);
       padding: 22px;
-      cursor: auto !important;
     }
 
-    /* ✅ Force curseur visible (au cas où) */
+    /* Force curseur visible ici (indépendant du style global) */
     html, body, * { cursor: auto !important; }
 
     .box{
@@ -83,7 +81,7 @@
     }
     button:hover{ background: rgba(255,255,255,.10); }
 
-    /* ===== Lock overlay (indépendant, à chaque visite) ===== */
+    /* ===== Lock overlay (always on each visit) ===== */
     body.is-locked{
       overflow: hidden;
       touch-action: none;
@@ -100,6 +98,10 @@
       background: rgba(7,8,18,.78);
       backdrop-filter: blur(12px);
       touch-action: manipulation;
+    }
+
+    .lockOverlay, .lockOverlay *{
+      cursor: auto !important;
     }
 
     .lockCard{
@@ -140,7 +142,8 @@
       padding: 0 12px;
       font-weight: 800;
       outline: none;
-      font-size: 16px; /* ✅ anti-zoom iOS */
+      font-size: 16px; /* anti-zoom iOS */
+      cursor: text !important;
     }
 
     .lockBtn{
@@ -151,7 +154,7 @@
       background: rgba(255,255,255,.06);
       color: var(--fg);
       font-weight: 900;
-      cursor: pointer;
+      cursor: pointer !important;
     }
 
     .lockError{
@@ -170,7 +173,6 @@
       <div id="info" class="muted"></div>
     </div>
 
-    <!-- ✅ Code visible (plus de ....) -->
     <div id="code" class="big">....</div>
 
     <div class="rowTop">
@@ -179,7 +181,6 @@
     </div>
   </div>
 
-  <!-- Lock obligatoire à chaque visite -->
   <div class="lockOverlay" id="lock">
     <div class="lockCard" role="dialog" aria-modal="true" aria-label="Accès privé">
       <h2 class="lockTitle">Accès privé</h2>
@@ -195,10 +196,7 @@
   </div>
 
   <script>
-    // 🔑 DOIT matcher app.js
-    const SECRET = "vrh";
-
-    // 🔐 Mot de passe de la page vrhok (fixe)
+    const SECRET = "vrh"; // must match app.js
     const PAGE_PASSWORD = "wyrsev-poxbEc-7parze";
 
     function getHourlyCode() {
@@ -225,6 +223,7 @@
     }
 
     const lock = document.getElementById("lock");
+    const card = lock.querySelector(".lockCard");
     const pw = document.getElementById("pw");
     const ok = document.getElementById("ok");
     const err = document.getElementById("err");
@@ -236,7 +235,7 @@
     function render() {
       const now = new Date();
       const code = getHourlyCode();
-      codeEl.textContent = code; // ✅ visible, plus de ....
+      codeEl.textContent = code;
       infoEl.textContent = `UTC: ${now.toUTCString()} — Paris: ${now.toLocaleString("fr-FR")}`;
     }
 
@@ -252,6 +251,7 @@
       }
       err.textContent = "Mot de passe incorrect.";
       pw.select();
+      pw.focus();
     }
 
     ok.addEventListener("click", unlockPage);
@@ -259,19 +259,22 @@
       if (e.key === "Enter") unlockPage();
     });
 
-    // Bloque scroll/clic tant que lock visible
-    ["wheel","touchmove","pointerdown","click"].forEach((evt) => {
-      lock.addEventListener(evt, (e) => {
-        e.preventDefault?.();
-        e.stopPropagation?.();
-      }, { passive: false, capture: true });
-    });
+    // Block scroll behind the overlay (but do NOT block taps on input)
+    lock.addEventListener("wheel", (e) => e.preventDefault(), { passive: false });
+    lock.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
 
-    // focus direct
-    setTimeout(() => pw.focus(), 60);
+    // If user taps outside the card, refocus input (fix "can't reopen keyboard")
+    lock.addEventListener("pointerdown", (e) => {
+      if (!card.contains(e.target)) {
+        e.preventDefault();
+        setTimeout(() => pw.focus(), 0);
+      }
+    }, { passive: false });
+
+    setTimeout(() => pw.focus(), 80);
 
     copyBtn.addEventListener("click", async () => {
-      const code = getHourlyCode(); // ✅ copie toujours le vrai code
+      const code = getHourlyCode();
       await navigator.clipboard.writeText(code);
       copyBtn.textContent = "Copié ✅";
       setTimeout(() => (copyBtn.textContent = "Copier"), 900);
