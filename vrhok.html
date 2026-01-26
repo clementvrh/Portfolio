@@ -4,53 +4,211 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>vrhok</title>
-  <link rel="stylesheet" href="./style.css?v=10" />
+
+  <style>
+    :root{
+      --bg:#070812;
+      --fg:#f5f6ff;
+      --muted:rgba(245,246,255,.72);
+      --line:rgba(255,255,255,.14);
+      --glass:rgba(255,255,255,.06);
+    }
+
+    html,body{min-height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color:var(--fg);
+      background:
+        radial-gradient(900px 520px at 18% 0%, rgba(124,92,255,.28), transparent 60%),
+        radial-gradient(900px 520px at 82% 10%, rgba(0,200,255,.18), transparent 58%),
+        radial-gradient(1200px 900px at 50% 120%, rgba(255,255,255,.06), transparent 70%),
+        var(--bg);
+      padding: 22px;
+      cursor: auto !important;
+    }
+
+    /* ✅ Force curseur visible (au cas où) */
+    html, body, * { cursor: auto !important; }
+
+    .box{
+      max-width: 720px;
+      margin: 0 auto;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      backdrop-filter: blur(12px);
+      padding: 16px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.55);
+    }
+
+    .rowTop{
+      display:flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .title{
+      margin:0;
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: -.02em;
+    }
+
+    .muted{
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .big{
+      font-size: 52px;
+      font-weight: 900;
+      letter-spacing: 6px;
+      margin: 12px 0 8px;
+      user-select: text;
+      word-break: break-word;
+    }
+
+    button{
+      height: 44px;
+      padding: 0 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+      color: var(--fg);
+      font-weight: 900;
+      cursor: pointer;
+    }
+    button:hover{ background: rgba(255,255,255,.10); }
+
+    /* ===== Lock overlay (indépendant, à chaque visite) ===== */
+    body.is-locked{
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    .lockOverlay{
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(7,8,18,.78);
+      backdrop-filter: blur(12px);
+      touch-action: manipulation;
+    }
+
+    .lockCard{
+      width: min(520px, 100%);
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      box-shadow: 0 18px 60px rgba(0,0,0,.60);
+      padding: 16px;
+    }
+
+    .lockTitle{
+      margin: 0;
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: -.02em;
+    }
+
+    .lockHint{
+      margin: 10px 0 12px;
+      color: rgba(245,246,255,.72);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .lockRow{
+      display:flex;
+      gap: 10px;
+    }
+
+    .lockInput{
+      flex: 1;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+      color: var(--fg);
+      padding: 0 12px;
+      font-weight: 800;
+      outline: none;
+      font-size: 16px; /* ✅ anti-zoom iOS */
+    }
+
+    .lockBtn{
+      height: 44px;
+      padding: 0 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+      color: var(--fg);
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .lockError{
+      margin-top: 10px;
+      font-size: 12px;
+      color: rgba(255,140,140,.90);
+      min-height: 16px;
+    }
+  </style>
 </head>
 
-<body data-page="vrhok">
-  <div class="cursor-dot" aria-hidden="true"></div>
-
-  <main class="wrap">
-    <div class="pageHead glass">
-      <h1 class="pageTitle">Code horaire</h1>
-      <p class="pageSub">Page interne — ne pas partager.</p>
+<body class="is-locked">
+  <div class="box" aria-hidden="true">
+    <div class="rowTop">
+      <h1 class="title">Code horaire</h1>
+      <div id="info" class="muted"></div>
     </div>
 
-    <section class="featured">
-      <div class="glass" style="padding:16px; border-radius:18px;">
-        <div style="color: var(--muted); font-size:13px; margin-bottom:8px;">
-          Code valable pour l’heure UTC en cours
-        </div>
+    <!-- ✅ Code visible (plus de ....) -->
+    <div id="code" class="big">....</div>
 
-        <div id="code" style="font-size:56px; font-weight:900; letter-spacing:6px; line-height:1; margin:10px 0;">
-          ....
-        </div>
+    <div class="rowTop">
+      <div class="muted">Valable pour l’heure UTC en cours.</div>
+      <button id="copy" type="button">Copier</button>
+    </div>
+  </div>
 
-        <div id="info" style="color: var(--muted); font-size:12px; margin-top:8px;"></div>
+  <!-- Lock obligatoire à chaque visite -->
+  <div class="lockOverlay" id="lock">
+    <div class="lockCard" role="dialog" aria-modal="true" aria-label="Accès privé">
+      <h2 class="lockTitle">Accès privé</h2>
+      <p class="lockHint">Entrez le mot de passe pour afficher le code horaire.</p>
 
-        <div style="display:flex; gap:10px; margin-top:14px;">
-          <button id="copy" class="lockBtn" type="button">Copier</button>
-          <a class="lockBtn" href="./index.html?v=10">Retour site</a>
-        </div>
+      <div class="lockRow">
+        <input id="pw" class="lockInput" type="password" autocomplete="off" placeholder="Mot de passe" aria-label="Mot de passe" />
+        <button id="ok" class="lockBtn" type="button">OK</button>
       </div>
-    </section>
-  </main>
+
+      <div id="err" class="lockError" aria-live="polite"></div>
+    </div>
+  </div>
 
   <script>
-    // Must match app.js
+    // 🔑 DOIT matcher app.js
     const SECRET = "vrh";
 
-    // Master password for this page (asked every visit)
-    const MASTER = "wyrsev-poxbEc-7parze";
+    // 🔐 Mot de passe de la page vrhok (fixe)
+    const PAGE_PASSWORD = "wyrsev-poxbEc-7parze";
 
-    function getHourlyCode(secret) {
+    function getHourlyCode() {
       const now = new Date();
       const y = now.getUTCFullYear();
       const m = now.getUTCMonth() + 1;
       const d = now.getUTCDate();
       const h = now.getUTCHours();
 
-      const base = `${secret}${y}${m}${d}${h}`;
+      const base = `${SECRET}${y}${m}${d}${h}`;
 
       let hash = 0;
       for (let i = 0; i < base.length; i++) {
@@ -66,86 +224,57 @@
       return code;
     }
 
-    // Lock overlay (NO persistence => re-asks every visit)
-    const overlay = document.createElement("div");
-    overlay.className = "lockOverlay is-on";
-    overlay.innerHTML = `
-      <div class="lockCard">
-        <div class="lockTop">
-          <h2 class="lockTitle">Accès vrhok</h2>
-          <button class="lockClose" type="button" aria-label="Fermer">Fermer</button>
-        </div>
+    const lock = document.getElementById("lock");
+    const pw = document.getElementById("pw");
+    const ok = document.getElementById("ok");
+    const err = document.getElementById("err");
 
-        <p class="lockHint">
-          Entrez le mot de passe pour afficher le code horaire.
-        </p>
-
-        <div class="lockRow">
-          <input class="lockInput" type="password" autocomplete="off"
-                 placeholder="Mot de passe" aria-label="Mot de passe" />
-          <button class="lockBtn" type="button">OK</button>
-        </div>
-
-        <div class="lockError" aria-live="polite"></div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-    document.body.classList.add("is-locked");
-
-    const input = overlay.querySelector(".lockInput");
-    const okBtn = overlay.querySelector(".lockBtn");
-    const closeBtn = overlay.querySelector(".lockClose");
-    const err = overlay.querySelector(".lockError");
-
-    function hideLock() {
-      overlay.classList.remove("is-on");
-      document.body.classList.remove("is-locked");
-    }
-
-    function unlock() {
-      const v = String(input.value || "").trim();
-      if (v === MASTER) {
-        err.textContent = "";
-        hideLock();
-        render();            // show code right away
-        setInterval(render, 1000);
-        return;
-      }
-      err.textContent = "Mot de passe incorrect.";
-      input.select();
-    }
-
-    okBtn.addEventListener("click", unlock);
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") unlock();
-    });
-    closeBtn.addEventListener("click", () => {
-      // Close just hides overlay; page still exists (your choice)
-      hideLock();
-    });
-
-    setTimeout(() => input.focus(), 50);
-
-    // Code UI
     const codeEl = document.getElementById("code");
     const infoEl = document.getElementById("info");
     const copyBtn = document.getElementById("copy");
 
     function render() {
       const now = new Date();
-      codeEl.textContent = getHourlyCode(SECRET);
+      const code = getHourlyCode();
+      codeEl.textContent = code; // ✅ visible, plus de ....
       infoEl.textContent = `UTC: ${now.toUTCString()} — Paris: ${now.toLocaleString("fr-FR")}`;
     }
 
-    copyBtn.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(codeEl.textContent);
-        copyBtn.textContent = "Copié ✅";
-        setTimeout(() => (copyBtn.textContent = "Copier"), 900);
-      } catch {
-        // fallback: select text visually (rare)
-        alert("Copie impossible automatiquement — sélectionnez le code manuellement.");
+    function unlockPage() {
+      const v = String(pw.value || "");
+      if (v === PAGE_PASSWORD) {
+        document.body.classList.remove("is-locked");
+        lock.style.display = "none";
+        err.textContent = "";
+        render();
+        setInterval(render, 1000);
+        return;
       }
+      err.textContent = "Mot de passe incorrect.";
+      pw.select();
+    }
+
+    ok.addEventListener("click", unlockPage);
+    pw.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") unlockPage();
+    });
+
+    // Bloque scroll/clic tant que lock visible
+    ["wheel","touchmove","pointerdown","click"].forEach((evt) => {
+      lock.addEventListener(evt, (e) => {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+      }, { passive: false, capture: true });
+    });
+
+    // focus direct
+    setTimeout(() => pw.focus(), 60);
+
+    copyBtn.addEventListener("click", async () => {
+      const code = getHourlyCode(); // ✅ copie toujours le vrai code
+      await navigator.clipboard.writeText(code);
+      copyBtn.textContent = "Copié ✅";
+      setTimeout(() => (copyBtn.textContent = "Copier"), 900);
     });
   </script>
 </body>

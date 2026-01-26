@@ -4,70 +4,67 @@
 
   /* ======================
      SOFT LOCK (HOME ONLY)
-     - QR friendly: no lock on load
-     - Locks on first interaction (scroll/click/swipe/key)
-     - Hourly code (4 chars) a-z0-9
+     - Triggers on first interaction (scroll/click/swipe/keyboard)
+     - No "Plus tard" => mandatory
+     - Hourly code (4 chars a-z0-9)
+     - Stores unlock for 60 minutes
   ====================== */
 
-  const isHome = document.body?.getAttribute("data-page") === "home";
+  (function setupHomeSoftLock() {
+    // ✅ uniquement la home
+    const page = document.body?.getAttribute("data-page");
+    if (page !== "home") return;
 
-  function getHourlyCode(secret) {
-    const now = new Date();
-
-    // UTC to be stable
-    const y = now.getUTCFullYear();
-    const m = now.getUTCMonth() + 1;
-    const d = now.getUTCDate();
-    const h = now.getUTCHours();
-
-    const base = `${secret}${y}${m}${d}${h}`;
-
-    // simple deterministic hash
-    let hash = 0;
-    for (let i = 0; i < base.length; i++) {
-      hash = (hash * 31 + base.charCodeAt(i)) >>> 0;
-    }
-
-    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-    let code = "";
-    for (let i = 0; i < 4; i++) {
-      code += chars[hash % chars.length];
-      hash = Math.floor(hash / chars.length);
-    }
-    return code;
-  }
-
-  if (isHome) {
     const LOCK = {
-      // 🔑 change this if you want
-      SECRET: "vrh",
+      SECRET: "vrh", // 🔑 change si tu veux (doit matcher vrhok.html)
       UNLOCK_MINUTES: 60,
       KEY: "vrh_unlocked_until",
     };
 
     const nowMs = () => Date.now();
+
     const isUnlocked = () => {
       const until = Number(localStorage.getItem(LOCK.KEY) || "0");
       return Number.isFinite(until) && until > nowMs();
     };
 
-    // Inject overlay
+    function getHourlyCode() {
+      const now = new Date();
+      const y = now.getUTCFullYear();
+      const m = now.getUTCMonth() + 1;
+      const d = now.getUTCDate();
+      const h = now.getUTCHours();
+
+      const base = `${LOCK.SECRET}${y}${m}${d}${h}`;
+
+      let hash = 0;
+      for (let i = 0; i < base.length; i++) {
+        hash = (hash * 31 + base.charCodeAt(i)) >>> 0;
+      }
+
+      const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+      let code = "";
+      for (let i = 0; i < 4; i++) {
+        code += chars[hash % chars.length];
+        hash = Math.floor(hash / chars.length);
+      }
+      return code;
+    }
+
+    // Overlay DOM injecté (pas besoin de toucher index.html)
     const overlay = document.createElement("div");
     overlay.className = "lockOverlay";
     overlay.innerHTML = `
-      <div class="lockCard">
-        <div class="lockTop">
-          <h2 class="lockTitle">Accès privé</h2>
-          <button class="lockClose" type="button" aria-label="Fermer">Plus tard</button>
-        </div>
+      <div class="lockCard" role="dialog" aria-modal="true" aria-label="Accès privé">
+        <h2 class="lockTitle">Accès privé</h2>
 
         <p class="lockHint">
           Site réservé à la prospection, veuillez contacter le numéro sur la carte de visite pour demander le mot de passe.
         </p>
 
         <div class="lockRow">
-          <input class="lockInput" type="password" inputmode="text" autocomplete="off"
-                placeholder="Mot de passe" aria-label="Mot de passe" />
+          <input class="lockInput" type="text" inputmode="text" autocapitalize="none" autocomplete="off"
+                 placeholder="Mot de passe" aria-label="Mot de passe" />
           <button class="lockBtn" type="button">OK</button>
         </div>
 
@@ -78,7 +75,6 @@
 
     const input = overlay.querySelector(".lockInput");
     const okBtn = overlay.querySelector(".lockBtn");
-    const closeBtn = overlay.querySelector(".lockClose");
     const err = overlay.querySelector(".lockError");
 
     function showLock() {
@@ -95,7 +91,7 @@
 
     function unlock() {
       const v = String(input.value || "").trim().toLowerCase();
-      const expected = getHourlyCode(LOCK.SECRET);
+      const expected = getHourlyCode();
 
       if (v === expected) {
         const until = nowMs() + LOCK.UNLOCK_MINUTES * 60 * 1000;
@@ -103,8 +99,7 @@
         hideLock();
         return;
       }
-
-      err.textContent = "Code incorrect.";
+      err.textContent = "Mot de passe incorrect.";
       input.select();
     }
 
@@ -112,22 +107,25 @@
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") unlock();
     });
-    closeBtn.addEventListener("click", hideLock);
 
-    // Prevent clicks from passing through overlay
-    overlay.addEventListener("pointerdown", (e) => e.stopPropagation());
-    overlay.addEventListener("click", (e) => e.stopPropagation());
-    overlay.addEventListener("wheel", (e) => e.stopPropagation(), { passive: false });
+    // Empêche tout clic/scroll de passer à travers l’overlay
+    overlay.addEventListener("pointerdown", (e) => e.stopPropagation(), { capture: true });
+    overlay.addEventListener("click", (e) => e.stopPropagation(), { capture: true });
+    overlay.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    }, { passive: false, capture: true });
+    overlay.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    }, { passive: false, capture: true });
 
-    // First interaction gate (capture)
+    // Déclencheur 1ère interaction (capture = avant navigation / sliders)
     let armed = true;
 
     function firstInteractionGate(e) {
       if (!armed) return;
-      if (isUnlocked()) {
-        armed = false;
-        return;
-      }
+      if (isUnlocked()) { armed = false; return; }
       if (overlay.classList.contains("is-on")) return;
 
       e.preventDefault?.();
@@ -144,7 +142,7 @@
     window.addEventListener("keydown", firstInteractionGate, { capture: true });
 
     if (isUnlocked()) armed = false;
-  }
+  })();
 
   /* ======================
      NAVIGATION PAGES
@@ -220,9 +218,6 @@
 
   /* ======================
      MOBILE: VIDEO SHIELD
-     - Without this, YouTube iframes eat the touch events on mobile
-     - Shield captures swipe
-     - Tap unlocks video for a few seconds to allow interaction
   ====================== */
 
   function setupVideoShields() {
@@ -253,7 +248,6 @@
         if (dx > 6 || dy > 6) moved = true;
       });
 
-      // Tap = unlock iframe temporarily
       shield.addEventListener("pointerup", () => {
         if (moved) return;
         wrap.classList.add("is-unlocked");
@@ -267,10 +261,6 @@
 
   /* ======================
      INFINITE CAROUSEL (TRANSFORM-BASED)
-     - Smooth (no cheap bounce)
-     - Infinite left/right
-     - Starts on first slide
-     - Any number of slides
   ====================== */
 
   function setupTransformCarousel(name) {
@@ -288,15 +278,12 @@
 
     if (totalEl) totalEl.textContent = String(n).padStart(2, "0");
 
-    // Track wrapper
     const track = document.createElement("div");
     track.className = "rail__track";
 
-    // Move originals into track (middle set)
     originals.forEach((el) => track.appendChild(el));
     const setB = Array.from(track.children);
 
-    // Clone A + C
     const fragA = document.createDocumentFragment();
     const fragC = document.createDocumentFragment();
 
@@ -319,9 +306,8 @@
     rail.innerHTML = "";
     rail.appendChild(track);
 
-    const slides = Array.from(track.children); // 3n
+    const slides = Array.from(track.children);
 
-    // Metrics
     let gap = 22;
     let cardW = 360;
     let step = 382;
@@ -335,13 +321,12 @@
       const g = parseFloat(cs.columnGap || cs.gap || "22");
       gap = Number.isFinite(g) ? g : 22;
 
-      const el = slides[n]; // first of middle set
+      const el = slides[n];
       cardW = el ? el.getBoundingClientRect().width : 360;
       step = cardW + gap;
       setW = step * n;
     }
 
-    // State
     let x = 0;
     let targetX = 0;
     let dragging = false;
@@ -382,12 +367,10 @@
       }
     }
 
-    // ✅ Smooth without bounce (no spring overshoot)
     function render() {
       const ease = dragging ? 0.22 : 0.14;
       x += (targetX - x) * ease;
 
-      // stop micro-jitter near target
       if (Math.abs(targetX - x) < 0.02) x = targetX;
 
       recenterIfNeeded();
@@ -414,7 +397,6 @@
       goTo(r, true);
     }
 
-    // Drag
     rail.addEventListener("pointerdown", (e) => {
       dragging = true;
       rail.setPointerCapture(e.pointerId);
@@ -440,7 +422,6 @@
     rail.addEventListener("pointercancel", endDrag);
     rail.addEventListener("lostpointercapture", endDrag);
 
-    // Wheel (desktop)
     rail.addEventListener(
       "wheel",
       (e) => {
@@ -454,7 +435,6 @@
       { passive: false }
     );
 
-    // Buttons
     document.querySelectorAll(`.arrowBtn[data-slider="${name}"]`).forEach((btn) => {
       btn.addEventListener("click", () => {
         const dir = Number(btn.dataset.dir || 1);
@@ -462,7 +442,6 @@
       });
     });
 
-    // Keyboard arrows (only on correct page)
     document.addEventListener("keydown", (e) => {
       const page = document.body.getAttribute("data-page");
       const ok = (name === "real" && page === "real") || (name === "reels" && page === "reels");
@@ -474,7 +453,7 @@
 
     const init = () => {
       measure();
-      goTo(0, false); // start at 1/n
+      goTo(0, false);
     };
 
     init();
